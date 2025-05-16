@@ -1,67 +1,67 @@
-name: Flutter CI Build
+name: Flutter Build CI
 
-# Controls when the workflow will run
 on:
   push:
-    branches: [ main ] # Or your default branch
+    branches: [ main ] # Triggers the workflow on push events to the main branch
   pull_request:
-    branches: [ main ] # Or your default branch
-  workflow_dispatch: # Allows manual triggering
+    branches: [ main ] # Triggers the workflow on pull requests to the main branch
+  workflow_dispatch: # Allows manual triggering of the workflow
 
 jobs:
-  #----------------------------------------------------
-  # Build Android (APK and AppBundle)
-  #----------------------------------------------------
   build_android:
     name: Build Flutter (Android)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Use a Linux runner for Android builds
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.x' # Specify your desired Flutter version, or omit to use latest stable
           channel: 'stable'
-          # cache: true
+          cache: true # Enable caching for faster builds
 
-      # Use 'pub upgrade' instead of 'pub get' to fetch latest plugin versions
-      # This is needed to resolve v1/v2 Android embedding issues (e.g., path_provider_android)
-      - name: Upgrade Flutter dependencies
-        run: flutter pub upgrade # Changed from 'flutter pub get'
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
-      # NOTE: Analyze and test steps removed.
+      - name: Build Flutter Android (APK - Debug)
+        run: flutter build apk --debug
+        # For a release APK, you'd typically use:
+        # run: flutter build apk --release
+        # This often requires setting up signing keys as secrets.
 
-      - name: Build Flutter APK (Release)
-        run: flutter build apk --release
-
-      - name: Build Flutter AppBundle (Release)
+      - name: Build Flutter Android (App Bundle - Release)
         run: flutter build appbundle --release
+        # This also typically requires setting up signing keys.
+        # For demonstration, we'll build a release appbundle without signing.
+        # In a real scenario, you'd need to add steps for keystore and signing.
+        # Example (requires secrets like KEYSTORE_BASE64, KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD):
+        # run: |
+        #   echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+        #   flutter build appbundle --release \
+        #     --keystore-password "${{ secrets.STORE_PASSWORD }}" \
+        #     --key-password "${{ secrets.KEY_PASSWORD }}" \
+        #     --keystore android/app/upload-keystore.jks \
+        #     --key-alias "${{ secrets.KEY_ALIAS }}"
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: android-apk-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error # Fails the step if the APK is not found
 
-      - name: Upload Android AppBundle Artifact
+      - name: Upload Android App Bundle Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-appbundle
+          name: android-appbundle-release
           path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error # Fails the step if the AAB is not found
 
-  #----------------------------------------------------
-  # Build iOS (Requires macOS runner)
-  #----------------------------------------------------
   build_ios:
     name: Build Flutter (iOS)
-    runs-on: macos-latest
+    runs-on: macos-latest # iOS builds require a macOS runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -69,156 +69,53 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.x' # Specify your desired Flutter version
           channel: 'stable'
-          # cache: true
+          cache: true
 
       - name: Get Flutter dependencies
-        run: flutter pub get # Keep 'get' here as iOS build was working
+        run: flutter pub get
 
-      # NOTE: Analyze and test steps removed.
+      # iOS specific setup (if needed, e.g., CocoaPods)
+      - name: Install CocoaPods
+        if: steps.flutter.outputs.framework-path # Only run if Flutter is set up
+        run: sudo gem install cocoapods
+        working-directory: ios
 
-      - name: Build Flutter iOS (Release - No Code Signing)
-        run: flutter build ios --release --no-codesign
+      - name: Install iOS Pods
+        if: steps.flutter.outputs.framework-path
+        run: pod install --repo-update
+        working-directory: ios
+        # Sometimes 'pod repo update' might be needed before 'pod install'
+        # if you encounter issues fetching pods.
 
-      - name: Upload iOS App Artifact
+      - name: Clean Flutter iOS build
+        run: flutter clean
+        working-directory: ios # Or flutter clean from the root if preferred
+
+      - name: Build Flutter iOS (IPA - Release)
+        run: flutter build ipa --release --no-codesign
+        # For a real release build, you would need to set up iOS code signing.
+        # This involves Apple Developer certificates and provisioning profiles,
+        # often stored as secrets in GitHub Actions.
+        # Example with code signing (requires secrets for P12 cert, profile, and password):
+        # run: |
+        #   echo "${{ secrets.IOS_P12_BASE64 }}" | base64 --decode > signing_certificate.p12
+        #   echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
+        #   KEYCHAIN_PASSWORD=$(openssl rand -base64 16) # Generate a random keychain password
+        #   security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        #   security default-keychain -s build.keychain
+        #   security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        #   security import signing_certificate.p12 -P "${{ secrets.IOS_P12_PASSWORD }}" -A -t cert -f pkcs12 -k build.keychain
+        #   mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        #   cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+        #   flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        #   # You would need an ExportOptions.plist configured for your app.
+
+      - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-ios-app # Contains the .app bundle
-          path: build/ios/iphoneos/Runner.app # Upload the .app directory
-
-  #----------------------------------------------------
-  # Build Web
-  #----------------------------------------------------
-  build_web:
-    name: Build Flutter (Web)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          # cache: true
-
-      - name: Enable Flutter Web
-        run: flutter config --enable-web
-
-      - name: Get Flutter dependencies
-        run: flutter pub get # Keep 'get' here as Web build was working
-
-      # NOTE: Analyze and test steps removed.
-
-      - name: Build Flutter Web (Release)
-        run: flutter build web --release
-
-      - name: Upload Web Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-web
-          path: build/web
-
-  #----------------------------------------------------
-  # Build Linux
-  #----------------------------------------------------
-  build_linux:
-    name: Build Flutter (Linux)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          # cache: true
-
-      - name: Enable Flutter Linux Desktop
-        run: flutter config --enable-linux-desktop
-
-      - name: Get Flutter dependencies
-        run: flutter pub get # Keep 'get' here as Linux build was working
-
-      # NOTE: Analyze and test steps removed.
-
-      - name: Build Flutter Linux (Release)
-        run: flutter build linux --release
-
-      - name: Upload Linux Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-linux
-          path: build/linux/x64/release/bundle
-
-  #----------------------------------------------------
-  # Build macOS (Requires macOS runner)
-  #----------------------------------------------------
-  build_macos:
-    name: Build Flutter (macOS)
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          # cache: true
-
-      - name: Enable Flutter macOS Desktop
-        run: flutter config --enable-macos-desktop
-
-      - name: Get Flutter dependencies
-        run: flutter pub get # Keep 'get' here as macOS build was working
-
-      # NOTE: Analyze and test steps removed.
-
-      - name: Build Flutter macOS (Release)
-        run: flutter build macos --release
-
-      - name: Upload macOS App Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-macos-app # Contains the .app bundle
-          path: build/macos/Build/Products/Release/*.app
-
-  #----------------------------------------------------
-  # Build Windows (Requires Windows runner)
-  #----------------------------------------------------
-  build_windows:
-    name: Build Flutter (Windows)
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          # cache: true
-
-      - name: Enable Flutter Windows Desktop
-        run: flutter config --enable-windows-desktop
-
-      - name: Get Flutter dependencies
-        run: flutter pub get # Keep 'get' here as Windows build was working
-
-      # NOTE: Analyze and test steps removed.
-
-      - name: Build Flutter Windows (Release)
-        run: flutter build windows --release
-
-      - name: Upload Windows Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-windows
-          path: build/windows/x64/runner/Release/
+          name: ios-ipa-release
+          path: build/ios/ipa/*.ipa # Path to the generated IPA file
+          # Or for archive: path: build/ios/archive/*.xcarchive
+          if-no-files-found: error # Fails the step if the IPA is not found
