@@ -1,16 +1,15 @@
-name: Flutter Build CI
+name: Build Android APK
 
 on:
   push:
-    branches: [ main ] # Triggers the workflow on push events to the main branch
+    branches: [ main ]
   pull_request:
-    branches: [ main ] # Triggers the workflow on pull requests to the main branch
-  workflow_dispatch: # Allows manual triggering of the workflow
+    branches: [ main ]
 
 jobs:
-  build_android:
-    name: Build Flutter (Android)
-    runs-on: ubuntu-latest # Use a Linux runner for Android builds
+  build:
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,104 +17,16 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x' # Specify your desired Flutter version, or omit to use latest stable
-          channel: 'stable'
-          cache: true # Enable caching for faster builds
+          flutter-version: 'stable'
 
-      - name: Get Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Flutter Android (APK - Debug)
-        run: flutter build apk --debug
-        # For a release APK, you'd typically use:
-        # run: flutter build apk --release
-        # This often requires setting up signing keys as secrets.
+      - name: Build APK
+        run: flutter build apk --release
 
-      - name: Build Flutter Android (App Bundle - Release)
-        run: flutter build appbundle --release
-        # This also typically requires setting up signing keys.
-        # For demonstration, we'll build a release appbundle without signing.
-        # In a real scenario, you'd need to add steps for keystore and signing.
-        # Example (requires secrets like KEYSTORE_BASE64, KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD):
-        # run: |
-        #   echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-        #   flutter build appbundle --release \
-        #     --keystore-password "${{ secrets.STORE_PASSWORD }}" \
-        #     --key-password "${{ secrets.KEY_PASSWORD }}" \
-        #     --keystore android/app/upload-keystore.jks \
-        #     --key-alias "${{ secrets.KEY_ALIAS }}"
-
-      - name: Upload Android APK Artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error # Fails the step if the APK is not found
-
-      - name: Upload Android App Bundle Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-appbundle-release
-          path: build/app/outputs/bundle/release/app-release.aab
-          if-no-files-found: error # Fails the step if the AAB is not found
-
-  build_ios:
-    name: Build Flutter (iOS)
-    runs-on: macos-latest # iOS builds require a macOS runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x' # Specify your desired Flutter version
-          channel: 'stable'
-          cache: true
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      # iOS specific setup (if needed, e.g., CocoaPods)
-      - name: Install CocoaPods
-        if: steps.flutter.outputs.framework-path # Only run if Flutter is set up
-        run: sudo gem install cocoapods
-        working-directory: ios
-
-      - name: Install iOS Pods
-        if: steps.flutter.outputs.framework-path
-        run: pod install --repo-update
-        working-directory: ios
-        # Sometimes 'pod repo update' might be needed before 'pod install'
-        # if you encounter issues fetching pods.
-
-      - name: Clean Flutter iOS build
-        run: flutter clean
-        working-directory: ios # Or flutter clean from the root if preferred
-
-      - name: Build Flutter iOS (IPA - Release)
-        run: flutter build ipa --release --no-codesign
-        # For a real release build, you would need to set up iOS code signing.
-        # This involves Apple Developer certificates and provisioning profiles,
-        # often stored as secrets in GitHub Actions.
-        # Example with code signing (requires secrets for P12 cert, profile, and password):
-        # run: |
-        #   echo "${{ secrets.IOS_P12_BASE64 }}" | base64 --decode > signing_certificate.p12
-        #   echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
-        #   KEYCHAIN_PASSWORD=$(openssl rand -base64 16) # Generate a random keychain password
-        #   security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-        #   security default-keychain -s build.keychain
-        #   security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-        #   security import signing_certificate.p12 -P "${{ secrets.IOS_P12_PASSWORD }}" -A -t cert -f pkcs12 -k build.keychain
-        #   mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        #   cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
-        #   flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
-        #   # You would need an ExportOptions.plist configured for your app.
-
-      - name: Upload iOS IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa-release
-          path: build/ios/ipa/*.ipa # Path to the generated IPA file
-          # Or for archive: path: build/ios/archive/*.xcarchive
-          if-no-files-found: error # Fails the step if the IPA is not found
+          name: app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
