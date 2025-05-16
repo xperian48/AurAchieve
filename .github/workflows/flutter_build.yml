@@ -1,15 +1,67 @@
-name: Build Android APK
+name: Flutter CI Build
 
+# Controls when the workflow will run
 on:
   push:
-    branches: [ main ]
+    branches: [ main ] # Or your default branch
   pull_request:
-    branches: [ main ]
+    branches: [ main ] # Or your default branch
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
-  build:
+  #----------------------------------------------------
+  # Build Android (APK and AppBundle)
+  #----------------------------------------------------
+  build_android:
+    name: Build Flutter (Android)
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          # cache: true
+
+      # Use 'pub upgrade' instead of 'pub get' to fetch latest plugin versions
+      # This is needed to resolve v1/v2 Android embedding issues (e.g., path_provider_android)
+      - name: Upgrade Flutter dependencies
+        run: flutter pub upgrade # Changed from 'flutter pub get'
+
+      # NOTE: Analyze and test steps removed.
+
+      - name: Build Flutter APK (Release)
+        run: flutter build apk --release
+
+      - name: Build Flutter AppBundle (Release)
+        run: flutter build appbundle --release
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload Android AppBundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-appbundle
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  #----------------------------------------------------
+  # Build iOS (Requires macOS runner)
+  #----------------------------------------------------
+  build_ios:
+    name: Build Flutter (iOS)
+    runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,16 +69,19 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          channel: 'stable'
+          # cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Get Flutter dependencies
+        run: flutter pub get # Keep 'get' here as iOS build was working
 
-      - name: Build APK
-        run: flutter build apk --release
+      # NOTE: Analyze and test steps removed.
 
-      - name: Upload APK artifact
+      - name: Build Flutter iOS (Release - No Code Signing)
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload iOS App Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: release-ios-app # Contains the .app bundle
+          path: build/ios/iphoneos/Runner.app # Upload the .app directory
