@@ -10,7 +10,7 @@ on:
 
 jobs:
   #----------------------------------------------------
-  # Build Android (APK and AppBundle)
+  # Build Android APK
   #----------------------------------------------------
   build_android:
     name: Build Flutter (Android)
@@ -38,24 +38,15 @@ jobs:
 
       # NOTE: Analyze and test steps removed.
 
-      - name: Build Flutter APK (Release)
-        run: flutter build apk --release
-
-      - name: Build Flutter AppBundle (Release)
-        run: flutter build appbundle --release
+      - name: Build Flutter APK (Debug)
+        run: flutter build apk --debug
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Upload Android AppBundle Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-appbundle
-          path: build/app/outputs/bundle/release/app-release.aab
-
+  
   #----------------------------------------------------
   # Build iOS (Requires macOS runner)
   #----------------------------------------------------
