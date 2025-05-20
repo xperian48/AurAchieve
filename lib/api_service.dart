@@ -1,14 +1,44 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:appwrite/appwrite.dart';
 
 class ApiService {
   final String _baseUrl =
-      "https://redesigned-robot-j9p7vgg64gp2r75-3000.app.github.dev/api"; // Your API URL
+      "https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net/api";
   final _storage = const FlutterSecureStorage();
+  final Account account;
+
+  ApiService({required this.account});
 
   Future<String?> _getAuthToken() async {
-    return await _storage.read(key: 'jwt_token');
+    String? token = await _storage.read(key: 'jwt_token');
+    if (token == null || _isJwtExpired(token)) {
+      try {
+        final jwt = await account.createJWT();
+        token = jwt.jwt;
+        await _storage.write(key: 'jwt_token', value: token);
+      } catch (e) {
+        await _storage.delete(key: 'jwt_token');
+        return null;
+      }
+    }
+    return token;
+  }
+
+  bool _isJwtExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      final payload = json.decode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      final exp = payload['exp'];
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      return exp is int ? exp < now : true;
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<Map<String, String>> _getHeaders() async {
@@ -19,7 +49,6 @@ class ApiService {
     };
   }
 
-  // User Profile
   Future<Map<String, dynamic>> getUserProfile() async {
     final response = await http.get(
       Uri.parse('$_baseUrl/user/profile'),
@@ -34,7 +63,6 @@ class ApiService {
     }
   }
 
-  // Tasks
   Future<List<dynamic>> getTasks() async {
     final response = await http.get(
       Uri.parse('$_baseUrl/tasks'),
@@ -49,14 +77,12 @@ class ApiService {
     }
   }
 
-  // Modified: Create task
   Future<Map<String, dynamic>> createTask({
     required String name,
-    required String taskCategory, // "normal" or "timed"
-    int? durationMinutes, // Optional, for timed tasks
+    required String taskCategory,
+    int? durationMinutes,
   }) async {
     final Map<String, dynamic> body = {
-      // Ensure 'body' is defined here
       'name': name,
       'taskCategory': taskCategory,
     };
@@ -67,7 +93,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse('$_baseUrl/tasks'),
       headers: await _getHeaders(),
-      body: jsonEncode(body), // Now 'body' is correctly referenced
+      body: jsonEncode(body),
     );
     if (response.statusCode == 201) {
       return jsonDecode(response.body);
@@ -87,13 +113,12 @@ class ApiService {
     }
   }
 
-  // Complete a "good" normal task (with image) - Renamed for clarity
   Future<Map<String, dynamic>> completeNormalImageVerifiableTask(
     String taskId,
     String imageBase64,
   ) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/tasks/$taskId/complete'), // Existing endpoint
+      Uri.parse('$_baseUrl/tasks/$taskId/complete'),
       headers: await _getHeaders(),
       body: jsonEncode({'imageBase64': imageBase64}),
     );
@@ -111,7 +136,6 @@ class ApiService {
     }
   }
 
-  // NEW: Complete a "good" normal task (NO image)
   Future<Map<String, dynamic>> completeNormalNonVerifiableTask(
     String taskId,
   ) async {
@@ -133,12 +157,22 @@ class ApiService {
     }
   }
 
-  // NEW: Complete a Timed Task
-  Future<Map<String, dynamic>> completeTimedTask(String taskId) async {
+  Future<Map<String, dynamic>> completeTimedTask(
+    String taskId, {
+    int? actualDurationSpentMinutes,
+  }) async {
+    final Map<String, dynamic> body = {};
+    if (actualDurationSpentMinutes != null) {
+      body['actualDurationSpentMinutes'] = actualDurationSpentMinutes;
+    }
+
     final response = await http.post(
       Uri.parse('$_baseUrl/tasks/$taskId/complete-timed'),
       headers: await _getHeaders(),
+
+      body: body.isNotEmpty ? jsonEncode(body) : null,
     );
+
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -149,11 +183,12 @@ class ApiService {
           errorMessage = errorBody['message'];
         }
       } catch (_) {}
-      throw Exception('$errorMessage (Status: ${response.statusCode})');
+      throw Exception(
+        '$errorMessage (Status: ${response.statusCode}, Body: ${response.body})',
+      );
     }
   }
 
-  // Complete a "bad" task (no image) - for tasks of type 'bad'
   Future<Map<String, dynamic>> completeBadTask(String taskId) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/tasks/$taskId/complete-bad'),

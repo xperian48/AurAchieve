@@ -6,12 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:flutter/services.dart';
 
 import 'stats.dart';
 import 'api_service.dart';
 import 'widgets/dynamic_color_svg.dart';
 import 'screens/auth_check_screen.dart';
+import 'timer_page.dart';
 
 class HomePage extends StatefulWidget {
   final Account account;
@@ -21,44 +22,51 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _Task {
+class Task {
   final String id;
   final String name;
-  final String intensity; // easy, medium, hard
-  String type; // good, bad
-  final String status; // pending, completed
-  final String taskCategory; // normal, timed
-  final int? durationMinutes; // For timed tasks
-  final bool isImageVerifiable; // For normal tasks
-
-  final String? createdAt;
+  final String intensity;
+  final String type;
+  final String taskCategory;
+  final int? durationMinutes;
+  final bool isImageVerifiable;
+  final String status;
+  final String userId;
+  final String createdAt;
   final String? completedAt;
 
-  _Task({
+  Task({
     required this.id,
     required this.name,
     required this.intensity,
     required this.type,
-    required this.status,
     required this.taskCategory,
     this.durationMinutes,
     required this.isImageVerifiable,
-    this.createdAt,
+    required this.status,
+    required this.userId,
+    required this.createdAt,
     this.completedAt,
   });
 
-  factory _Task.fromJson(Map<String, dynamic> json) {
-    return _Task(
-      id: json['_id'] ?? json['\$id'] ?? '',
-      name: json['name'] ?? 'Unknown Task',
+  factory Task.fromJson(Map<String, dynamic> json) {
+    return Task(
+      id: json['\$id'] ?? '',
+      name: json['name'] ?? 'Unnamed Task',
       intensity: json['intensity'] ?? 'easy',
       type: json['type'] ?? 'good',
-      status: json['status'] ?? 'pending',
       taskCategory: json['taskCategory'] ?? 'normal',
-      durationMinutes: json['durationMinutes'] as int?,
+      durationMinutes:
+          json['durationMinutes'] is int
+              ? json['durationMinutes']
+              : (json['durationMinutes'] is String
+                  ? int.tryParse(json['durationMinutes']) ?? null
+                  : null),
       isImageVerifiable: json['isImageVerifiable'] ?? false,
-      createdAt: json['createdAt'],
-      completedAt: json['completedAt'],
+      status: json['status'] ?? 'pending',
+      userId: json['userId'] ?? '',
+      createdAt: json['createdAt'] ?? DateTime.now().toIso8601String(),
+      completedAt: json['completedAt'] as String?,
     );
   }
 }
@@ -66,16 +74,19 @@ class _Task {
 class _HomePageState extends State<HomePage> {
   String userName = 'User';
   bool isLoading = true;
-  List<_Task> tasks = [];
+  List<Task> tasks = [];
+  List<Task> completedTasks = [];
   int aura = 50;
   List<int> auraHistory = [50];
+  Map<String, dynamic>? _userProfile;
 
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   final _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
+    _apiService = ApiService(account: widget.account);
     _initApp();
   }
 
@@ -89,41 +100,52 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadUserName() async {
     try {
       final models.User user = await widget.account.get();
-      if (mounted)
+      if (mounted) {
         setState(() => userName = user.name.isNotEmpty ? user.name : "User");
+      }
     } catch (e) {
-      print('Failed to load user name: $e');
       if (mounted) setState(() => userName = "User");
     }
   }
 
   Future<void> _fetchDataFromServer() async {
+    if (!mounted) return;
+    setState(() => isLoading = true);
     try {
-      final profileData = await _apiService.getUserProfile();
-      final tasksData = await _apiService.getTasks();
+      final fetchedTasks = await _apiService.getTasks();
+      final fetchedProfile = await _apiService.getUserProfile();
+
       if (mounted) {
         setState(() {
-          aura = profileData['aura'] ?? 50;
+          tasks =
+              fetchedTasks
+                  .map((taskJson) => Task.fromJson(taskJson))
+                  .where((task) => task.status == 'pending')
+                  .toList();
+          completedTasks =
+              fetchedTasks
+                  .map((taskJson) => Task.fromJson(taskJson))
+                  .where((task) => task.status == 'completed')
+                  .toList();
+          _userProfile = fetchedProfile;
+          aura = fetchedProfile['aura'] ?? 50;
           if (auraHistory.isEmpty || auraHistory.last != aura) {
             auraHistory.add(aura);
             if (auraHistory.length > 8) {
               auraHistory = auraHistory.sublist(auraHistory.length - 8);
             }
           }
-          tasks =
-              tasksData.map((taskJson) => _Task.fromJson(taskJson)).toList();
-          tasks =
-              tasks
-                  .where((task) => !task.name.trimLeft().startsWith('-'))
-                  .toList();
         });
       }
     } catch (e) {
-      print('Failed to fetch data from server: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading data: ${e.toString()}')),
+          SnackBar(content: Text('Error fetching data: ${e.toString()}')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
       }
     }
   }
@@ -140,15 +162,13 @@ class _HomePageState extends State<HomePage> {
           (Route<dynamic> route) => false,
         );
       }
-    } catch (e) {
-      print('Logout failed: $e');
-    }
+    } catch (e) {}
   }
 
   void _addTask() async {
     final taskNameController = TextEditingController();
     final durationController = TextEditingController();
-    String selectedTaskCategory = 'normal'; // Default category
+    String selectedTaskCategory = 'normal';
 
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -156,7 +176,6 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) {
         return StatefulBuilder(
-          // For managing local state of the modal
           builder: (BuildContext context, StateSetter modalSetState) {
             return Padding(
               padding: EdgeInsets.only(
@@ -207,9 +226,20 @@ class _HomePageState extends State<HomePage> {
                   TextField(
                     controller: taskNameController,
                     autofocus: true,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Enter task name',
                       labelText: 'Task Name',
+                      labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      hintStyle: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -219,9 +249,20 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: durationController,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Enter duration in minutes',
                         labelText: 'Duration (minutes)',
+                        labelStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        hintStyle: TextStyle(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -253,8 +294,9 @@ class _HomePageState extends State<HomePage> {
                               final duration = int.tryParse(
                                 durationController.text.trim(),
                               );
-                              if (duration == null || duration <= 0)
-                                return; // Basic validation
+                              if (duration == null || duration <= 0) {
+                                return;
+                              }
                               data['duration'] = duration;
                             }
                             Navigator.pop(context, data);
@@ -275,7 +317,7 @@ class _HomePageState extends State<HomePage> {
     if (result != null) {
       final String name = result['name'];
       final String category = result['category'];
-      final int? duration = result['duration']; // Will be null if not timed
+      final int? duration = result['duration'];
 
       try {
         setState(() => isLoading = true);
@@ -284,26 +326,31 @@ class _HomePageState extends State<HomePage> {
           taskCategory: category,
           durationMinutes: duration,
         );
-        if (mounted) {
-          setState(() {
-            tasks.add(_Task.fromJson(newTaskData));
-            isLoading = false;
-          });
-        }
+        await _fetchDataFromServer();
       } catch (e) {
         if (mounted) {
-          setState(() => isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to add task: ${e.toString()}')),
           );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => isLoading = false);
         }
       }
     }
   }
 
   Future<void> _deleteTask(int index) async {
-    // ... (remains the same)
-    final taskToDelete = tasks[index];
+    final pendingTasks = tasks.where((t) => t.status == 'pending').toList();
+    if (index < 0 || index >= pendingTasks.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Task index out of bounds.')),
+      );
+      return;
+    }
+    final Task taskToDelete = pendingTasks[index];
+
     final confirm = await showDialog<bool>(
       context: context,
       builder:
@@ -334,7 +381,7 @@ class _HomePageState extends State<HomePage> {
         await _apiService.deleteTask(taskToDelete.id);
         if (mounted) {
           setState(() {
-            tasks.removeAt(index);
+            tasks.remove(taskToDelete);
             isLoading = false;
           });
         }
@@ -350,7 +397,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _completeTask(int index) async {
-    final task = tasks[index];
+    if (index < 0 || index >= tasks.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error completing task: Invalid index.")),
+      );
+      return;
+    }
+    final Task task = tasks[index];
     Map<String, dynamic>? apiCallResult;
 
     bool dialogWasShown = false;
@@ -358,29 +411,20 @@ class _HomePageState extends State<HomePage> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => Center(child: CircularProgressIndicator()),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
       dialogWasShown = true;
     }
 
     try {
       if (task.type == "bad") {
-        // Handle tasks explicitly marked or classified as 'bad'
-        // Bad tasks (regardless of category 'normal' or 'timed') might have specific completion logic
-        // If a timed task is 'bad', it uses completeTimedTask which handles negative aura.
-        // If a normal task is 'bad', it uses completeBadTask.
         if (task.taskCategory == 'timed') {
           apiCallResult = await _apiService.completeTimedTask(task.id);
         } else {
-          // Normal 'bad' task
           apiCallResult = await _apiService.completeBadTask(task.id);
         }
       } else {
-        // Task type is "good"
-        if (task.taskCategory == "timed") {
-          apiCallResult = await _apiService.completeTimedTask(task.id);
-        } else {
-          // Normal "good" task
+        if (task.taskCategory == "normal") {
           if (task.isImageVerifiable) {
             final picker = ImagePicker();
             final pickedFile = await picker.pickImage(
@@ -398,35 +442,37 @@ class _HomePageState extends State<HomePage> {
               base64Image,
             );
           } else {
-            // Normal, good, but not image verifiable
             apiCallResult = await _apiService.completeNormalNonVerifiableTask(
               task.id,
             );
           }
+        } else if (task.taskCategory == 'timed') {
+          apiCallResult = await _apiService.completeTimedTask(task.id);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Unsupported task completion for ${task.name}."),
+              ),
+            );
+          }
+          if (dialogWasShown && mounted) Navigator.pop(context);
+          return;
         }
       }
 
-      if (apiCallResult != null) {
-        if (mounted) {
-          setState(() {
-            aura = apiCallResult!['newAura'];
-            if (auraHistory.isEmpty || auraHistory.last != aura) {
-              auraHistory.add(aura);
-              if (auraHistory.length > 8)
-                auraHistory = auraHistory.sublist(auraHistory.length - 8);
-            }
-            tasks.removeAt(index);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${apiCallResult['message']} Aura change: ${apiCallResult['auraChange']}',
-              ),
-              backgroundColor: Theme.of(context).colorScheme.primary,
+      if (apiCallResult != null && mounted) {
+        await _fetchDataFromServer();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${apiCallResult['message'] ?? 'Task status updated.'} Aura change: ${apiCallResult['auraChange'] ?? 0}',
             ),
-          );
-        }
-      }
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      } else if (apiCallResult == null && mounted) {}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -438,12 +484,14 @@ class _HomePageState extends State<HomePage> {
       }
     } finally {
       if (dialogWasShown && mounted) Navigator.pop(context);
+      if (mounted && isLoading) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
   Future<void> _markTaskAsBadClientSide(int index) async {
-    // ... (remains the same)
-    final task = tasks[index];
+    final Task task = tasks[index];
     if (task.status == 'completed') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Cannot change type of a completed task.')),
@@ -455,8 +503,7 @@ class _HomePageState extends State<HomePage> {
       final updatedTaskData = await _apiService.markTaskAsBad(task.id);
       if (mounted) {
         setState(() {
-          // The API returns the full updated task, so we can re-parse it
-          tasks[index] = _Task.fromJson(updatedTaskData);
+          tasks[index] = Task.fromJson(updatedTaskData);
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -478,9 +525,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        // ... (AppBar remains the same) ...
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
@@ -509,10 +555,7 @@ class _HomePageState extends State<HomePage> {
                         tasks:
                             tasks.where((t) => t.status == 'pending').toList(),
                         auraHistory: auraHistory,
-                        completedTasks:
-                            tasks
-                                .where((t) => t.status == 'completed')
-                                .toList(),
+                        completedTasks: completedTasks,
                       ),
                 ),
               );
@@ -533,7 +576,6 @@ class _HomePageState extends State<HomePage> {
               ? Center(child: CircularProgressIndicator())
               : CustomScrollView(
                 slivers: [
-                  // ... (Header slivers remain the same) ...
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
@@ -542,7 +584,7 @@ class _HomePageState extends State<HomePage> {
                           style: GoogleFonts.ebGaramond(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onBackground,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                           children: [
                             const TextSpan(text: 'Hi, '),
@@ -576,7 +618,7 @@ class _HomePageState extends State<HomePage> {
                               color: Theme.of(context).colorScheme.onSurface,
                               letterSpacing: 0.5,
                             ),
-                          ), // Adjusted color
+                          ),
                         ],
                       ),
                     ),
@@ -648,14 +690,15 @@ class _HomePageState extends State<HomePage> {
                                   .where((t) => t.status == 'pending')
                                   .toList();
                           final task = pendingTasks[index];
+                          final originalTaskIndex = tasks.indexOf(task);
+
                           return Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 18.0,
                               vertical: 4,
                             ),
                             child: GestureDetector(
-                              onLongPress:
-                                  () => _deleteTask(tasks.indexOf(task)),
+                              onLongPress: () => _deleteTask(originalTaskIndex),
                               child: Material(
                                 elevation: 2,
                                 borderRadius: BorderRadius.circular(18),
@@ -664,15 +707,31 @@ class _HomePageState extends State<HomePage> {
                                       context,
                                     ).colorScheme.surfaceContainerHigh,
                                 child: ListTile(
-                                  onTap:
-                                      () => _completeTask(tasks.indexOf(task)),
+                                  onTap: () {
+                                    if (task.taskCategory == "timed" &&
+                                        task.type == "good" &&
+                                        task.status == "pending") {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => TimerPage(
+                                                task: task,
+                                                apiService: _apiService,
+                                                onTaskCompleted: () {
+                                                  _fetchDataFromServer();
+                                                },
+                                              ),
+                                        ),
+                                      );
+                                    } else if (task.status == "pending") {
+                                      _completeTask(originalTaskIndex);
+                                    }
+                                  },
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(18),
                                   ),
-                                  leading: _buildTaskIcon(
-                                    task,
-                                    context,
-                                  ), // Updated leading icon
+                                  leading: _buildTaskIcon(task, context),
                                   title: Text(
                                     task.name,
                                     style: GoogleFonts.gabarito(
@@ -684,10 +743,7 @@ class _HomePageState extends State<HomePage> {
                                           ).colorScheme.onSurface,
                                     ),
                                   ),
-                                  subtitle: _buildTaskSubtitle(
-                                    task,
-                                    context,
-                                  ), // Updated subtitle
+                                  subtitle: _buildTaskSubtitle(task, context),
                                   trailing: Icon(
                                     Icons.arrow_forward_ios_rounded,
                                     size: 18,
@@ -715,7 +771,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTaskIcon(_Task task, BuildContext context) {
+  Widget _buildTaskIcon(Task task, BuildContext context) {
     if (task.type == "bad") {
       return CircleAvatar(
         backgroundColor: Colors.purple.shade100,
@@ -736,11 +792,10 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
-    // Normal, good task
     return _materialYouTaskIcon(task.intensity, context);
   }
 
-  Widget _buildTaskSubtitle(_Task task, BuildContext context) {
+  Widget _buildTaskSubtitle(Task task, BuildContext context) {
     List<Widget> subtitleChildren = [];
 
     if (task.type == "bad") {
@@ -766,7 +821,6 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } else {
-      // Good task
       subtitleChildren.add(
         Text(
           _capitalize(task.intensity),
@@ -788,7 +842,6 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       } else {
-        // Normal good task
         subtitleChildren.add(SizedBox(width: 4));
         subtitleChildren.add(
           Icon(
@@ -816,8 +869,7 @@ class _HomePageState extends State<HomePage> {
           ),
         );
 
-        // Only show "Mark as Bad" for good, normal tasks that are not yet bad
-        subtitleChildren.add(Spacer()); // Pushes the button to the right
+        subtitleChildren.add(Spacer());
         subtitleChildren.add(
           TextButton.icon(
             style: TextButton.styleFrom(
@@ -847,8 +899,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _materialYouTaskIcon(String intensity, BuildContext context) {
-    // ... (remains the same)
-    switch (intensity) {
+    switch (intensity.toLowerCase()) {
       case 'easy':
         return CircleAvatar(
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
@@ -878,7 +929,8 @@ class _HomePageState extends State<HomePage> {
         );
       default:
         return CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor:
+              Theme.of(context).colorScheme.surfaceContainerHighest,
           child: Icon(
             Icons.task_alt_rounded,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

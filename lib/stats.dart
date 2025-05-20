@@ -217,7 +217,7 @@ class _AuraLineChart extends StatelessWidget {
       children: [
         CustomPaint(
           painter: _LineChartPainter(auraTimeline, color, minAura, maxAura),
-          child: Container(height: 180, width: double.infinity),
+          child: SizedBox(height: 180, width: double.infinity),
         ),
         Positioned(
           bottom: 0,

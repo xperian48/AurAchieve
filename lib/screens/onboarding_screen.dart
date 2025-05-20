@@ -78,10 +78,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   }
 
   Future<void> login() async {
-    if (!mounted)
+    if (!mounted) {
       setState(() => isBusy = true);
-    else
+    } else {
       isBusy = true;
+    }
 
     try {
       await widget.account.createEmailPasswordSession(
@@ -397,7 +398,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: LayoutBuilder(

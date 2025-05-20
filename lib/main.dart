@@ -99,7 +99,7 @@ class _AuthCheckState extends State<AuthCheck> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -120,13 +120,13 @@ class AuraOnboarding extends StatefulWidget {
 
 class DynamicColorSvg extends StatelessWidget {
   const DynamicColorSvg({
-    Key? key,
+    super.key,
     required this.assetName,
     required this.color,
     this.width,
     this.height,
     this.fit = BoxFit.contain,
-  }) : super(key: key);
+  });
 
   final String assetName;
   final Color color;
@@ -557,7 +557,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: LayoutBuilder(
