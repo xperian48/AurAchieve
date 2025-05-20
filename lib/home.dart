@@ -2,31 +2,76 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart'; // For TextInputFormatter
+
 import 'stats.dart';
+import 'api_service.dart';
+import 'widgets/dynamic_color_svg.dart';
+import 'screens/auth_check_screen.dart';
 
 class HomePage extends StatefulWidget {
   final Account account;
-
   const HomePage({super.key, required this.account});
 
   @override
   _HomePageState createState() => _HomePageState();
 }
 
+class _Task {
+  final String id;
+  final String name;
+  final String intensity; // easy, medium, hard
+  String type; // good, bad
+  final String status; // pending, completed
+  final String taskCategory; // normal, timed
+  final int? durationMinutes; // For timed tasks
+  final bool isImageVerifiable; // For normal tasks
+
+  final String? createdAt;
+  final String? completedAt;
+
+  _Task({
+    required this.id,
+    required this.name,
+    required this.intensity,
+    required this.type,
+    required this.status,
+    required this.taskCategory,
+    this.durationMinutes,
+    required this.isImageVerifiable,
+    this.createdAt,
+    this.completedAt,
+  });
+
+  factory _Task.fromJson(Map<String, dynamic> json) {
+    return _Task(
+      id: json['_id'] ?? json['\$id'] ?? '',
+      name: json['name'] ?? 'Unknown Task',
+      intensity: json['intensity'] ?? 'easy',
+      type: json['type'] ?? 'good',
+      status: json['status'] ?? 'pending',
+      taskCategory: json['taskCategory'] ?? 'normal',
+      durationMinutes: json['durationMinutes'] as int?,
+      isImageVerifiable: json['isImageVerifiable'] ?? false,
+      createdAt: json['createdAt'],
+      completedAt: json['completedAt'],
+    );
+  }
+}
+
 class _HomePageState extends State<HomePage> {
   String userName = 'User';
   bool isLoading = true;
   List<_Task> tasks = [];
-  List<_Task> completedTasks = [];
-  int aura = 50; // Default startup Aura is now 50
-  String? apiKey;
-  List<int> auraHistory = [];
+  int aura = 50;
+  List<int> auraHistory = [50];
+
+  final ApiService _apiService = ApiService();
+  final _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
@@ -35,133 +80,65 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _initApp() async {
+    setState(() => isLoading = true);
     await _loadUserName();
-    await _loadApiKey();
-    await _loadTasksAndAura();
-    await _loadCompletedTasks();
-    await _loadAuraHistory();
-    setState(() {
-      isLoading = false;
-    });
-    if (apiKey == null) {
-      _askForApiKey();
-    }
+    await _fetchDataFromServer();
+    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> _loadUserName() async {
     try {
       final models.User user = await widget.account.get();
-      setState(() {
-        userName = user.name;
-      });
+      if (mounted)
+        setState(() => userName = user.name.isNotEmpty ? user.name : "User");
     } catch (e) {
-      print('Failed to load user: $e');
+      print('Failed to load user name: $e');
+      if (mounted) setState(() => userName = "User");
     }
   }
 
-  Future<void> _loadApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      apiKey = prefs.getString('gemini_api_key');
-    });
-  }
-
-  Future<void> _saveApiKey(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', key);
-    setState(() {
-      apiKey = key;
-    });
-  }
-
-  Future<void> _askForApiKey() async {
-    final controller = TextEditingController();
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Enter Gemini API Key'),
-            content: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: 'Paste your Gemini API Key',
-              ),
-              autofocus: true,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  if (controller.text.trim().isNotEmpty) {
-                    _saveApiKey(controller.text.trim());
-                    Navigator.pop(context);
-                  }
-                },
-                child: Text('Save'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<void> _saveTasksAndAura() async {
-    final prefs = await SharedPreferences.getInstance();
-    final taskList = tasks.map((t) => jsonEncode(t.toJson())).toList();
-    final completedList =
-        completedTasks.map((t) => jsonEncode(t.toJson())).toList();
-    await prefs.setStringList('tasks', taskList);
-    await prefs.setStringList('completed_tasks', completedList);
-    await prefs.setInt('aura', aura);
-    await _saveAuraHistory();
-  }
-
-  Future<void> _loadTasksAndAura() async {
-    final prefs = await SharedPreferences.getInstance();
-    final taskList = prefs.getStringList('tasks') ?? [];
-    setState(() {
-      tasks = taskList.map((t) => _Task.fromJson(jsonDecode(t))).toList();
-      aura = prefs.getInt('aura') ?? 50;
-    });
-  }
-
-  Future<void> _loadCompletedTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final completedList = prefs.getStringList('completed_tasks') ?? [];
-    setState(() {
-      completedTasks =
-          completedList.map((t) => _Task.fromJson(jsonDecode(t))).toList();
-    });
-  }
-
-  Future<void> _saveAuraHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Only add if different from last or if it's a new day
-    if (auraHistory.isEmpty || auraHistory.last != aura) {
-      auraHistory.add(aura);
-      if (auraHistory.length > 8) {
-        auraHistory = auraHistory.sublist(auraHistory.length - 8);
+  Future<void> _fetchDataFromServer() async {
+    try {
+      final profileData = await _apiService.getUserProfile();
+      final tasksData = await _apiService.getTasks();
+      if (mounted) {
+        setState(() {
+          aura = profileData['aura'] ?? 50;
+          if (auraHistory.isEmpty || auraHistory.last != aura) {
+            auraHistory.add(aura);
+            if (auraHistory.length > 8) {
+              auraHistory = auraHistory.sublist(auraHistory.length - 8);
+            }
+          }
+          tasks =
+              tasksData.map((taskJson) => _Task.fromJson(taskJson)).toList();
+          tasks =
+              tasks
+                  .where((task) => !task.name.trimLeft().startsWith('-'))
+                  .toList();
+        });
       }
-      await prefs.setStringList(
-        'aura_history',
-        auraHistory.map((e) => e.toString()).toList(),
-      );
+    } catch (e) {
+      print('Failed to fetch data from server: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading data: ${e.toString()}')),
+        );
+      }
     }
-  }
-
-  Future<void> _loadAuraHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final history = prefs.getStringList('aura_history') ?? [];
-    setState(() {
-      auraHistory = history.map((e) => int.tryParse(e) ?? 50).toList();
-      if (auraHistory.isEmpty) auraHistory = [aura];
-    });
   }
 
   Future<void> logout() async {
     try {
       await widget.account.deleteSession(sessionId: 'current');
+      await _storage.delete(key: 'jwt_token');
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => AuthCheckScreen(account: widget.account),
+          ),
+          (Route<dynamic> route) => false,
+        );
       }
     } catch (e) {
       print('Logout failed: $e');
@@ -169,170 +146,171 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _addTask() async {
-    final controller = TextEditingController();
-    final result = await showModalBottomSheet<String>(
+    final taskNameController = TextEditingController();
+    final durationController = TextEditingController();
+    String selectedTaskCategory = 'normal'; // Default category
+
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder:
-          (context) => Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 32,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Add Task',
-                  style: GoogleFonts.gabarito(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'Enter your task',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+      builder: (context) {
+        return StatefulBuilder(
+          // For managing local state of the modal
+          builder: (BuildContext context, StateSetter modalSetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 32,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add New Task',
+                    style: GoogleFonts.gabarito(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceVariant,
                   ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          side: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Cancel'),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Task Category:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Normal Task'),
+                    value: 'normal',
+                    groupValue: selectedTaskCategory,
+                    onChanged:
+                        (value) =>
+                            modalSetState(() => selectedTaskCategory = value!),
+                    activeColor: Theme.of(context).colorScheme.primary,
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Timed Task'),
+                    value: 'timed',
+                    groupValue: selectedTaskCategory,
+                    onChanged:
+                        (value) =>
+                            modalSetState(() => selectedTaskCategory = value!),
+                    activeColor: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: taskNameController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Enter task name',
+                      labelText: 'Task Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed:
-                            () =>
-                                Navigator.pop(context, controller.text.trim()),
-                        style: FilledButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                  ),
+                  if (selectedTaskCategory == 'timed') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: durationController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter duration in minutes',
+                        labelText: 'Duration (minutes)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text('Add'),
                       ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
                   ],
-                ),
-              ],
-            ),
-          ),
-    );
-    if (result != null && result.isNotEmpty) {
-      final classification = await _classifyTaskWithGemini(result);
-      if (classification != null) {
-        setState(() {
-          tasks.add(
-            _Task(
-              result,
-              classification['intensity'] ?? '', // Ensure non-null String
-              classification['type'] ?? '', // Ensure non-null String
-            ),
-          );
-        });
-        await _saveTasksAndAura();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not classify task. Please try again.')),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            final name = taskNameController.text.trim();
+                            if (name.isEmpty) return;
+                            Map<String, dynamic> data = {
+                              'name': name,
+                              'category': selectedTaskCategory,
+                            };
+                            if (selectedTaskCategory == 'timed') {
+                              final duration = int.tryParse(
+                                durationController.text.trim(),
+                              );
+                              if (duration == null || duration <= 0)
+                                return; // Basic validation
+                              data['duration'] = duration;
+                            }
+                            Navigator.pop(context, data);
+                          },
+                          child: const Text('Add Task'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         );
+      },
+    );
+
+    if (result != null) {
+      final String name = result['name'];
+      final String category = result['category'];
+      final int? duration = result['duration']; // Will be null if not timed
+
+      try {
+        setState(() => isLoading = true);
+        final newTaskData = await _apiService.createTask(
+          name: name,
+          taskCategory: category,
+          durationMinutes: duration,
+        );
+        if (mounted) {
+          setState(() {
+            tasks.add(_Task.fromJson(newTaskData));
+            isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to add task: ${e.toString()}')),
+          );
+        }
       }
     }
   }
 
-  Future<Map<String, String>?> _classifyTaskWithGemini(String task) async {
-    final key = apiKey;
-    if (key == null) return null;
-    final endpoint =
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$key';
-
-    final prompt = '''
-Classify the following task as "good" or "bad" (type), and as "easy", "medium", or "hard" (intensity). 
-Reply in JSON: {"type":"good|bad","intensity":"easy|medium|hard"}.
-Task: $task
-''';
-
-    final body = jsonEncode({
-      "contents": [
-        {
-          "parts": [
-            {"text": prompt},
-          ],
-        },
-      ],
-    });
-
-    final response = await http.post(
-      Uri.parse(endpoint),
-      headers: {"Content-Type": "application/json"},
-      body: body,
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final text =
-          data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
-      try {
-        final json = jsonDecode(text);
-        if (json is Map &&
-            json.containsKey('type') &&
-            json.containsKey('intensity')) {
-          return {'type': json['type'], 'intensity': json['intensity']};
-        }
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  void _removePrefixedTasks() async {
-    setState(() {
-      tasks =
-          tasks.where((task) => !task.name.trimLeft().startsWith('-')).toList();
-    });
-    await _saveTasksAndAura();
-  }
-
   Future<void> _deleteTask(int index) async {
+    // ... (remains the same)
+    final taskToDelete = tasks[index];
     final confirm = await showDialog<bool>(
       context: context,
       builder:
           (context) => AlertDialog(
             title: Text('Delete Task?'),
             content: Text(
-              'Are you sure you want to delete "${tasks[index].name}"?',
+              'Are you sure you want to delete "${taskToDelete.name}"?',
             ),
             actions: [
               TextButton(
@@ -351,142 +329,158 @@ Task: $task
           ),
     );
     if (confirm == true) {
-      setState(() {
-        tasks.removeAt(index);
-      });
-      await _saveTasksAndAura();
+      try {
+        setState(() => isLoading = true);
+        await _apiService.deleteTask(taskToDelete.id);
+        if (mounted) {
+          setState(() {
+            tasks.removeAt(index);
+            isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete task: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 
   Future<void> _completeTask(int index) async {
     final task = tasks[index];
-    if (task.type == "bad") {
-      setState(() {
-        aura -= _getAuraForIntensity(task.intensity);
-        completedTasks.add(tasks[index]);
-        tasks.removeAt(index);
-      });
-      await _saveTasksAndAura();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Bad task completed. Aura -${_getAuraForIntensity(task.intensity)}',
+    Map<String, dynamic>? apiCallResult;
+
+    bool dialogWasShown = false;
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(child: CircularProgressIndicator()),
+      );
+      dialogWasShown = true;
+    }
+
+    try {
+      if (task.type == "bad") {
+        // Handle tasks explicitly marked or classified as 'bad'
+        // Bad tasks (regardless of category 'normal' or 'timed') might have specific completion logic
+        // If a timed task is 'bad', it uses completeTimedTask which handles negative aura.
+        // If a normal task is 'bad', it uses completeBadTask.
+        if (task.taskCategory == 'timed') {
+          apiCallResult = await _apiService.completeTimedTask(task.id);
+        } else {
+          // Normal 'bad' task
+          apiCallResult = await _apiService.completeBadTask(task.id);
+        }
+      } else {
+        // Task type is "good"
+        if (task.taskCategory == "timed") {
+          apiCallResult = await _apiService.completeTimedTask(task.id);
+        } else {
+          // Normal "good" task
+          if (task.isImageVerifiable) {
+            final picker = ImagePicker();
+            final pickedFile = await picker.pickImage(
+              source: ImageSource.camera,
+              preferredCameraDevice: CameraDevice.rear,
+            );
+            if (pickedFile == null) {
+              if (dialogWasShown && mounted) Navigator.pop(context);
+              return;
+            }
+            final bytes = await File(pickedFile.path).readAsBytes();
+            final base64Image = base64Encode(bytes);
+            apiCallResult = await _apiService.completeNormalImageVerifiableTask(
+              task.id,
+              base64Image,
+            );
+          } else {
+            // Normal, good, but not image verifiable
+            apiCallResult = await _apiService.completeNormalNonVerifiableTask(
+              task.id,
+            );
+          }
+        }
+      }
+
+      if (apiCallResult != null) {
+        if (mounted) {
+          setState(() {
+            aura = apiCallResult!['newAura'];
+            if (auraHistory.isEmpty || auraHistory.last != aura) {
+              auraHistory.add(aura);
+              if (auraHistory.length > 8)
+                auraHistory = auraHistory.sublist(auraHistory.length - 8);
+            }
+            tasks.removeAt(index);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${apiCallResult['message']} Aura change: ${apiCallResult['auraChange']}',
+              ),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task completion failed: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
+        );
+      }
+    } finally {
+      if (dialogWasShown && mounted) Navigator.pop(context);
+    }
+  }
+
+  Future<void> _markTaskAsBadClientSide(int index) async {
+    // ... (remains the same)
+    final task = tasks[index];
+    if (task.status == 'completed') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cannot change type of a completed task.')),
       );
       return;
     }
-
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.rear,
-    );
-
-    if (pickedFile == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(child: CircularProgressIndicator()),
-    );
-
-    final isValid = await _verifyTaskWithGemini2Flash(
-      File(pickedFile.path),
-      tasks[index].name,
-    );
-
-    Navigator.pop(context); // Remove loading dialog
-
-    if (isValid) {
-      setState(() {
-        aura += _getAuraForIntensity(tasks[index].intensity);
-        completedTasks.add(tasks[index]);
-        tasks.removeAt(index);
-      });
-      await _saveTasksAndAura();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Task marked as complete! Aura +${_getAuraForIntensity(tasks[index].intensity)}',
+    try {
+      setState(() => isLoading = true);
+      final updatedTaskData = await _apiService.markTaskAsBad(task.id);
+      if (mounted) {
+        setState(() {
+          // The API returns the full updated task, so we can re-parse it
+          tasks[index] = _Task.fromJson(updatedTaskData);
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Task "${task.name}" marked as bad.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to mark task as bad: ${e.toString()}'),
           ),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gemini could not verify the task as complete.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+        );
+      }
     }
-  }
-
-  int _getAuraForIntensity(String intensity) {
-    switch (intensity) {
-      case 'easy':
-        return 5;
-      case 'medium':
-        return 10;
-      case 'hard':
-        return 15;
-      default:
-        return 5;
-    }
-  }
-
-  Future<bool> _verifyTaskWithGemini2Flash(File image, String task) async {
-    final key = apiKey;
-    if (key == null) return false;
-    final endpoint =
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$key';
-
-    final bytes = await image.readAsBytes();
-    final base64Image = base64Encode(bytes);
-
-    final body = jsonEncode({
-      "contents": [
-        {
-          "parts": [
-            {
-              "text":
-                  "Does this photo show that the following task is completed? Task: $task. Reply only with yes or no.",
-            },
-            {
-              "inline_data": {"mime_type": "image/jpeg", "data": base64Image},
-            },
-          ],
-        },
-      ],
-    });
-
-    final response = await http.post(
-      Uri.parse(endpoint),
-      headers: {"Content-Type": "application/json"},
-      body: body,
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final text =
-          data['candidates']?[0]?['content']?['parts']?[0]?['text']
-              ?.toString()
-              .toLowerCase() ??
-          '';
-      return text.contains('yes');
-    }
-    return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    _removePrefixedTasks();
-
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
       appBar: AppBar(
+        // ... (AppBar remains the same) ...
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
@@ -512,9 +506,13 @@ Task: $task
                   builder:
                       (context) => StatsPage(
                         aura: aura,
-                        tasks: tasks,
+                        tasks:
+                            tasks.where((t) => t.status == 'pending').toList(),
                         auraHistory: auraHistory,
-                        completedTasks: completedTasks,
+                        completedTasks:
+                            tasks
+                                .where((t) => t.status == 'completed')
+                                .toList(),
                       ),
                 ),
               );
@@ -522,13 +520,11 @@ Task: $task
           ),
           IconButton(
             icon: Icon(
-              Icons.settings_rounded,
+              Icons.refresh_rounded,
               color: Theme.of(context).colorScheme.primary,
             ),
-            onPressed: () {
-              print('settings');
-            },
-            tooltip: 'Settings',
+            onPressed: _fetchDataFromServer,
+            tooltip: 'Refresh Data',
           ),
         ],
       ),
@@ -537,6 +533,7 @@ Task: $task
               ? Center(child: CircularProgressIndicator())
               : CustomScrollView(
                 slivers: [
+                  // ... (Header slivers remain the same) ...
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
@@ -576,10 +573,10 @@ Task: $task
                             'Your Aura: $aura',
                             style: GoogleFonts.gabarito(
                               fontSize: 18,
-                              color: Theme.of(context).colorScheme.secondary,
+                              color: Theme.of(context).colorScheme.onSurface,
                               letterSpacing: 0.5,
                             ),
-                          ),
+                          ), // Adjusted color
                         ],
                       ),
                     ),
@@ -614,20 +611,21 @@ Task: $task
                       ),
                     ),
                   ),
-                  tasks.isEmpty
+                  (tasks.where((t) => t.status == 'pending').toList().isEmpty)
                       ? SliverFillRemaining(
                         hasScrollBody: false,
                         child: Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              SvgPicture.asset(
-                                'assets/img/empty_tasks.svg',
+                              DynamicColorSvg(
+                                assetName: 'assets/img/empty_tasks.svg',
                                 height: 180,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                               const SizedBox(height: 24),
                               Text(
-                                'No tasks added yet.',
+                                'No active tasks.',
                                 style: GoogleFonts.roboto(
                                   fontSize: 20,
                                   color: Theme.of(context).colorScheme.outline,
@@ -638,43 +636,43 @@ Task: $task
                         ),
                       )
                       : SliverList.separated(
-                        itemCount: tasks.length,
+                        itemCount:
+                            tasks
+                                .where((t) => t.status == 'pending')
+                                .toList()
+                                .length,
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
-                          final task = tasks[index];
+                          final pendingTasks =
+                              tasks
+                                  .where((t) => t.status == 'pending')
+                                  .toList();
+                          final task = pendingTasks[index];
                           return Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 18.0,
                               vertical: 4,
                             ),
                             child: GestureDetector(
-                              onLongPress: () => _deleteTask(index),
+                              onLongPress:
+                                  () => _deleteTask(tasks.indexOf(task)),
                               child: Material(
                                 elevation: 2,
                                 borderRadius: BorderRadius.circular(18),
                                 color:
                                     Theme.of(
                                       context,
-                                    ).colorScheme.surfaceVariant,
+                                    ).colorScheme.surfaceContainerHigh,
                                 child: ListTile(
+                                  onTap:
+                                      () => _completeTask(tasks.indexOf(task)),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(18),
                                   ),
-                                  leading:
-                                      task.type == "bad"
-                                          ? CircleAvatar(
-                                            backgroundColor:
-                                                Colors.purple.shade100,
-                                            child: Icon(
-                                              Icons.warning_amber_rounded,
-                                              color: Colors.purple,
-                                              size: 26,
-                                            ),
-                                          )
-                                          : _materialYouTaskIcon(
-                                            task.intensity,
-                                            context,
-                                          ),
+                                  leading: _buildTaskIcon(
+                                    task,
+                                    context,
+                                  ), // Updated leading icon
                                   title: Text(
                                     task.name,
                                     style: GoogleFonts.gabarito(
@@ -686,75 +684,17 @@ Task: $task
                                           ).colorScheme.onSurface,
                                     ),
                                   ),
-                                  subtitle:
-                                      task.type == "bad"
-                                          ? Text(
-                                            "Bad Task",
-                                            style: GoogleFonts.gabarito(
-                                              fontSize: 13,
-                                              color: Colors.purple,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          )
-                                          : Row(
-                                            children: [
-                                              Text(
-                                                _capitalize(task.intensity),
-                                                style: GoogleFonts.gabarito(
-                                                  fontSize: 13,
-                                                  color:
-                                                      Theme.of(
-                                                        context,
-                                                      ).colorScheme.primary,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              TextButton.icon(
-                                                style: TextButton.styleFrom(
-                                                  minimumSize: Size(0, 0),
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 0,
-                                                  ),
-                                                  tapTargetSize:
-                                                      MaterialTapTargetSize
-                                                          .shrinkWrap,
-                                                  visualDensity:
-                                                      VisualDensity.compact,
-                                                ),
-                                                icon: Icon(
-                                                  Icons.flag,
-                                                  size: 16,
-                                                  color: Colors.purple,
-                                                ),
-                                                label: Text(
-                                                  "Mark as Bad",
-                                                  style: GoogleFonts.gabarito(
-                                                    fontSize: 12,
-                                                    color: Colors.purple,
-                                                  ),
-                                                ),
-                                                onPressed: () async {
-                                                  setState(() {
-                                                    tasks[index] = _Task(
-                                                      task.name,
-                                                      task.intensity,
-                                                      "bad",
-                                                    );
-                                                  });
-                                                  await _saveTasksAndAura();
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                  trailing: IconButton(
-                                    icon: Icon(
-                                      Icons.check_circle_rounded,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
-                                    tooltip: 'Mark as complete',
-                                    onPressed: () => _completeTask(index),
+                                  subtitle: _buildTaskSubtitle(
+                                    task,
+                                    context,
+                                  ), // Updated subtitle
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 18,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant
+                                        .withOpacity(0.6),
                                   ),
                                 ),
                               ),
@@ -775,14 +715,146 @@ Task: $task
     );
   }
 
+  Widget _buildTaskIcon(_Task task, BuildContext context) {
+    if (task.type == "bad") {
+      return CircleAvatar(
+        backgroundColor: Colors.purple.shade100,
+        child: Icon(
+          Icons.warning_amber_rounded,
+          color: Colors.purple,
+          size: 26,
+        ),
+      );
+    }
+    if (task.taskCategory == "timed") {
+      return CircleAvatar(
+        backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
+        child: Icon(
+          Icons.timer_outlined,
+          color: Theme.of(context).colorScheme.onTertiaryContainer,
+          size: 26,
+        ),
+      );
+    }
+    // Normal, good task
+    return _materialYouTaskIcon(task.intensity, context);
+  }
+
+  Widget _buildTaskSubtitle(_Task task, BuildContext context) {
+    List<Widget> subtitleChildren = [];
+
+    if (task.type == "bad") {
+      subtitleChildren.add(
+        Text(
+          "Bad Task - ${_capitalize(task.intensity)}",
+          style: GoogleFonts.gabarito(
+            fontSize: 13,
+            color: Colors.purple,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      if (task.taskCategory == 'timed' && task.durationMinutes != null) {
+        subtitleChildren.add(
+          Text(
+            " (${task.durationMinutes} min)",
+            style: GoogleFonts.gabarito(
+              fontSize: 12,
+              color: Colors.purple.withOpacity(0.8),
+            ),
+          ),
+        );
+      }
+    } else {
+      // Good task
+      subtitleChildren.add(
+        Text(
+          _capitalize(task.intensity),
+          style: GoogleFonts.gabarito(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      );
+
+      if (task.taskCategory == 'timed' && task.durationMinutes != null) {
+        subtitleChildren.add(
+          Text(
+            " - Timed (${task.durationMinutes} min)",
+            style: GoogleFonts.gabarito(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+        );
+      } else {
+        // Normal good task
+        subtitleChildren.add(SizedBox(width: 4));
+        subtitleChildren.add(
+          Icon(
+            task.isImageVerifiable
+                ? Icons.camera_alt_outlined
+                : Icons.check_circle_outline,
+            size: 14,
+            color:
+                task.isImageVerifiable
+                    ? Colors.blueGrey
+                    : Colors.green.shade700,
+          ),
+        );
+        subtitleChildren.add(SizedBox(width: 2));
+        subtitleChildren.add(
+          Text(
+            task.isImageVerifiable ? "Photo" : "Honor",
+            style: GoogleFonts.gabarito(
+              fontSize: 11,
+              color:
+                  task.isImageVerifiable
+                      ? Colors.blueGrey
+                      : Colors.green.shade700,
+            ),
+          ),
+        );
+
+        // Only show "Mark as Bad" for good, normal tasks that are not yet bad
+        subtitleChildren.add(Spacer()); // Pushes the button to the right
+        subtitleChildren.add(
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              minimumSize: Size(0, 0),
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: Icon(
+              Icons.flag_outlined,
+              size: 16,
+              color: Colors.orange.shade700,
+            ),
+            label: Text(
+              "Flag as Bad",
+              style: GoogleFonts.gabarito(
+                fontSize: 11,
+                color: Colors.orange.shade700,
+              ),
+            ),
+            onPressed: () => _markTaskAsBadClientSide(tasks.indexOf(task)),
+          ),
+        );
+      }
+    }
+    return Row(children: subtitleChildren);
+  }
+
   Widget _materialYouTaskIcon(String intensity, BuildContext context) {
+    // ... (remains the same)
     switch (intensity) {
       case 'easy':
         return CircleAvatar(
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           child: Icon(
             Icons.eco_rounded,
-            color: Theme.of(context).colorScheme.primary,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
             size: 26,
           ),
         );
@@ -791,7 +863,7 @@ Task: $task
           backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
           child: Icon(
             Icons.bolt_rounded,
-            color: Theme.of(context).colorScheme.secondary,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
             size: 26,
           ),
         );
@@ -800,7 +872,7 @@ Task: $task
           backgroundColor: Theme.of(context).colorScheme.errorContainer,
           child: Icon(
             Icons.whatshot_rounded,
-            color: Theme.of(context).colorScheme.error,
+            color: Theme.of(context).colorScheme.onErrorContainer,
             size: 26,
           ),
         );
@@ -809,7 +881,7 @@ Task: $task
           backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
           child: Icon(
             Icons.task_alt_rounded,
-            color: Theme.of(context).colorScheme.primary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             size: 26,
           ),
         );
@@ -818,20 +890,4 @@ Task: $task
 
   String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-}
-
-class _Task {
-  final String name;
-  final String intensity;
-  final String type; // "good" or "bad"
-  _Task(this.name, this.intensity, this.type);
-
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'intensity': intensity,
-    'type': type,
-  };
-
-  static _Task fromJson(Map<String, dynamic> map) =>
-      _Task(map['name'], map['intensity'], map['type']);
 }

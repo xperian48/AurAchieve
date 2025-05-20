@@ -1,114 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:dynamic_color/dynamic_color.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'theme.dart';
-import 'home.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  Client client = Client();
-  client
-      .setEndpoint('https://fra.cloud.appwrite.io/v1')
-      .setProject('6800a2680008a268a6a3')
-      .setSelfSigned(status: true);
-  Account account = Account(client);
-  runApp(MyApp(account: account));
-}
-
-class MyApp extends StatelessWidget {
-  final Account account;
-  const MyApp({super.key, required this.account});
-
-  @override
-  Widget build(BuildContext context) {
-    return DynamicColorBuilder(
-      builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        final lightColorScheme =
-            lightDynamic ??
-            MaterialTheme(GoogleFonts.gabaritoTextTheme()).light().colorScheme;
-        final darkColorScheme =
-            darkDynamic ??
-            MaterialTheme(GoogleFonts.gabaritoTextTheme()).dark().colorScheme;
-        return MaterialApp(
-          theme: ThemeData(
-            colorScheme: lightColorScheme,
-            textTheme: GoogleFonts.gabaritoTextTheme(),
-            useMaterial3: true,
-          ),
-          darkTheme: ThemeData(
-            colorScheme: darkColorScheme,
-            textTheme: GoogleFonts.gabaritoTextTheme(),
-            useMaterial3: true,
-          ),
-          themeMode: ThemeMode.system,
-          home: AuthCheck(account: account),
-          debugShowCheckedModeBanner: false,
-        );
-      },
-    );
-  }
-}
-
-class AuthCheck extends StatefulWidget {
-  final Account account;
-  const AuthCheck({super.key, required this.account});
-
-  @override
-  _AuthCheckState createState() => _AuthCheckState();
-}
-
-class _AuthCheckState extends State<AuthCheck> {
-  bool isLoading = true;
-  models.User? loggedInUser;
-  final _storage = const FlutterSecureStorage();
-
-  @override
-  void initState() {
-    super.initState();
-    _checkLoginStatusAndFetchToken();
-  }
-
-  Future<void> _checkLoginStatusAndFetchToken() async {
-    try {
-      final user = await widget.account.get();
-      try {
-        final jwt = await widget.account.createJWT();
-        await _storage.write(key: 'jwt_token', value: jwt.jwt);
-      } catch (e) {
-        print("Failed to create JWT: $e");
-        await _storage.delete(key: 'jwt_token');
-      }
-      setState(() {
-        loggedInUser = user;
-        isLoading = false;
-      });
-    } catch (e) {
-      await _storage.delete(key: 'jwt_token');
-      setState(() {
-        isLoading = false;
-        loggedInUser = null;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.background,
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (loggedInUser != null) {
-      return HomePage(account: widget.account);
-    }
-    return AuraOnboarding(account: widget.account);
-  }
-}
+import '../widgets/dynamic_color_svg.dart';
+import '../home.dart';
 
 class AuraOnboarding extends StatefulWidget {
   final Account account;
@@ -116,69 +12,6 @@ class AuraOnboarding extends StatefulWidget {
 
   @override
   State<AuraOnboarding> createState() => _AuraOnboardingState();
-}
-
-class DynamicColorSvg extends StatelessWidget {
-  const DynamicColorSvg({
-    Key? key,
-    required this.assetName,
-    required this.color,
-    this.width,
-    this.height,
-    this.fit = BoxFit.contain,
-  }) : super(key: key);
-
-  final String assetName;
-  final Color color;
-  final double? width;
-  final double? height;
-  final BoxFit fit;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<String>(
-      future: DefaultAssetBundle.of(context).loadString(assetName),
-      builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
-        String svgStringToShow;
-
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return SizedBox(width: width, height: height);
-        }
-
-        if (snapshot.hasError) {
-          print('Error loading SVG $assetName: ${snapshot.error}');
-          svgStringToShow =
-              '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>';
-        } else {
-          svgStringToShow =
-              snapshot.data ??
-              '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>';
-        }
-
-        final String r = color.red.toRadixString(16).padLeft(2, '0');
-        final String g = color.green.toRadixString(16).padLeft(2, '0');
-        final String b = color.blue.toRadixString(16).padLeft(2, '0');
-        final String colorHex = '#$r$g$b'.toUpperCase();
-
-        final RegExp currentColorRegExp = RegExp(
-          r'currentColor',
-          caseSensitive: false,
-        );
-        String finalSvgString = svgStringToShow.replaceAll(
-          currentColorRegExp,
-          colorHex,
-        );
-
-        return SvgPicture.string(
-          finalSvgString,
-          width: width,
-          height: height,
-          fit: fit,
-        );
-      },
-    );
-  }
 }
 
 class _AuraOnboardingState extends State<AuraOnboarding> {
@@ -219,6 +52,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   }
 
   void showError(String msg) {
+    if (!mounted) return;
     setState(() => error = msg);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Colors.red.shade400),
@@ -239,12 +73,16 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
       showError(
         'Registration failed: ${e.toString().replaceAll('AppwriteException: ', '')}',
       );
-      setState(() => isBusy = false);
+      if (mounted) setState(() => isBusy = false);
     }
   }
 
   Future<void> login() async {
-    setState(() => isBusy = true);
+    if (!mounted)
+      setState(() => isBusy = true);
+    else
+      isBusy = true;
+
     try {
       await widget.account.createEmailPasswordSession(
         email: emailController.text.trim(),
@@ -326,7 +164,6 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
         'desc': 'Let AI verify your progress and help you grow.',
       },
     ];
-
     return Expanded(
       child: Stack(
         children: [
@@ -415,75 +252,76 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           TextField(
             controller: nameController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Name',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              prefixIcon: Icon(Icons.person_rounded),
             ),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           ),
           SizedBox(height: 16),
           TextField(
             controller: emailController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Email',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              prefixIcon: Icon(Icons.email_rounded),
             ),
             keyboardType: TextInputType.emailAddress,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           ),
           SizedBox(height: 16),
           TextField(
             controller: passwordController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Password',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              prefixIcon: Icon(Icons.lock_rounded),
             ),
             obscureText: true,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           ),
           SizedBox(height: 24),
-          FilledButton.icon(
-            icon: Icon(Icons.person_add_alt_1_rounded),
-            onPressed: isBusy ? null : register,
-            label:
-                isBusy
-                    ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : Text(
-                      'Sign Up',
-                      style: GoogleFonts.gabarito(fontSize: 18),
-                    ),
-            style: FilledButton.styleFrom(
-              minimumSize: Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          if (error.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Text(
+                error,
+                style: TextStyle(color: Colors.red.shade400, fontSize: 14),
               ),
             ),
-          ),
-          SizedBox(height: 12),
+          isBusy
+              ? CircularProgressIndicator()
+              : FilledButton.icon(
+                icon: Icon(Icons.person_add_alt_1_rounded),
+                onPressed: register,
+                label: Text(
+                  'Sign Up',
+                  style: GoogleFonts.gabarito(fontSize: 18),
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+          SizedBox(height: 16),
           TextButton(
             onPressed:
                 () => setState(() {
                   showSignup = false;
-                  stopCarousel = false;
-                  Future.microtask(_autoPlayFeatures);
+                  showLogin = true;
+                  error = '';
                 }),
-            child: Text('Back', style: GoogleFonts.gabarito()),
+            child: Text('Already have an account? Login'),
           ),
         ],
       ),
@@ -494,60 +332,62 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           TextField(
             controller: emailController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Email',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              prefixIcon: Icon(Icons.email_rounded),
             ),
             keyboardType: TextInputType.emailAddress,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           ),
           SizedBox(height: 16),
           TextField(
             controller: passwordController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Password',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              prefixIcon: Icon(Icons.lock_rounded),
             ),
             obscureText: true,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           ),
           SizedBox(height: 24),
-          FilledButton.icon(
-            icon: Icon(Icons.login_rounded),
-            onPressed: isBusy ? null : login,
-            label:
-                isBusy
-                    ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : Text('Login', style: GoogleFonts.gabarito(fontSize: 18)),
-            style: FilledButton.styleFrom(
-              minimumSize: Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          if (error.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Text(
+                error,
+                style: TextStyle(color: Colors.red.shade400, fontSize: 14),
               ),
             ),
-          ),
-          SizedBox(height: 12),
+          isBusy
+              ? CircularProgressIndicator()
+              : FilledButton.icon(
+                icon: Icon(Icons.login_rounded),
+                onPressed: login,
+                label: Text('Login', style: GoogleFonts.gabarito(fontSize: 18)),
+                style: FilledButton.styleFrom(
+                  minimumSize: Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+          SizedBox(height: 16),
           TextButton(
             onPressed:
                 () => setState(() {
                   showLogin = false;
-                  stopCarousel = false;
-                  Future.microtask(_autoPlayFeatures);
+                  showSignup = true;
+                  error = '';
                 }),
-            child: Text('Back', style: GoogleFonts.gabarito()),
+            child: Text('Don\'t have an account? Sign Up'),
           ),
         ],
       ),
@@ -590,6 +430,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                               () => setState(() {
                                 showSignup = true;
                                 stopCarousel = true;
+                                error = '';
                               }),
                           label: Text(
                             'Get Started',
@@ -609,6 +450,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                               () => setState(() {
                                 showLogin = true;
                                 stopCarousel = true;
+                                error = '';
                               }),
                           label: Text(
                             'Login',

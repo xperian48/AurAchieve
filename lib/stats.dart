@@ -6,7 +6,7 @@ class StatsPage extends StatelessWidget {
   final int aura;
   final List tasks;
   final List<int> auraHistory;
-  final List completedTasks; // Pass completed tasks only
+  final List completedTasks;
 
   const StatsPage({
     super.key,
@@ -22,7 +22,7 @@ class StatsPage extends StatelessWidget {
     if (aura < 100) return "Average Aura";
     if (aura < 150) return "Positive Aura";
     if (aura < 250) return "W Aura";
-    if (aura < 400) return "Huge W Aura";
+    if (aura < 500) return "Huge W Aura";
     return "Ascended Aura";
   }
 
@@ -68,13 +68,22 @@ class StatsPage extends StatelessWidget {
         padding: const EdgeInsets.all(24.0),
         child: ListView(
           children: [
-            Text('Aura Meter', style: GoogleFonts.gabarito(fontSize: 20)),
+            Text(
+              'Aura Meter',
+              style: GoogleFonts.gabarito(
+                fontSize: 20,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
             const SizedBox(height: 12),
             _AuraMeter(aura: aura, status: auraStatus, color: auraColor),
             const SizedBox(height: 32),
             Text(
               'Aura changes in the past',
-              style: GoogleFonts.gabarito(fontSize: 20),
+              style: GoogleFonts.gabarito(
+                fontSize: 20,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -87,7 +96,10 @@ class StatsPage extends StatelessWidget {
             const SizedBox(height: 32),
             Text(
               'Completed Tasks Breakdown',
-              style: GoogleFonts.gabarito(fontSize: 20),
+              style: GoogleFonts.gabarito(
+                fontSize: 20,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -103,7 +115,10 @@ class StatsPage extends StatelessWidget {
             const SizedBox(height: 32),
             Text(
               'Total Completed Tasks: ${completedTasks.length}',
-              style: GoogleFonts.gabarito(fontSize: 18),
+              style: GoogleFonts.gabarito(
+                fontSize: 18,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ],
         ),
@@ -136,7 +151,7 @@ class _AuraMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double percent = (aura / 400).clamp(0.0, 1.0);
+    double percent = (aura / 500).clamp(0.0, 1.0);
 
     return Column(
       children: [
@@ -144,8 +159,8 @@ class _AuraMeter extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             SizedBox(
-              width: 120,
-              height: 120,
+              width: 160,
+              height: 160,
               child: CircularProgressIndicator(
                 value: percent,
                 strokeWidth: 14,
@@ -265,7 +280,7 @@ class _LineChartPainter extends CustomPainter {
       } else {
         path.lineTo(x, y);
       }
-      // Draw points
+
       canvas.drawCircle(Offset(x, y), 5, pointPaint);
     }
     canvas.drawPath(path, paint);

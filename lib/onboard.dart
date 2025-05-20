@@ -5,7 +5,7 @@ import 'package:appwrite/appwrite.dart';
 import 'home.dart';
 
 class OnBoard extends StatelessWidget {
-  final Account account; // Accept the Appwrite Account object
+  final Account account;
 
   const OnBoard({super.key, required this.account});
 
@@ -14,18 +14,12 @@ class OnBoard extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute space
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Empty Spacer at the top
             SizedBox(height: 20),
 
-            // SVG in the middle
-            SvgPicture.asset(
-              'assets/img/welcome.svg', // Ensure you have this asset in your project
-              height: 300,
-            ),
+            SvgPicture.asset('assets/img/welcome.svg', height: 300),
 
-            // Text column at the bottom
             Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -44,7 +38,6 @@ class OnBoard extends StatelessWidget {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () {
-                    // Navigate to HomePage and pass the Account object
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -54,7 +47,7 @@ class OnBoard extends StatelessWidget {
                   },
                   child: Text('Get Started'),
                 ),
-                SizedBox(height: 12), // Add some padding at the bottom
+                SizedBox(height: 12),
               ],
             ),
           ],

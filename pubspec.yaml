@@ -1,5 +1,5 @@
 name: auraascend
-description: "A new Flutter project."
+description: "Fix your damn life with AuraAscend."
 publish_to: 'none'
 version: 0.1.0
 
@@ -10,10 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
   appwrite: ^15.0.2
-  flutter_svg: ^2.0.0
+  flutter_svg: ^2.0.10
   google_fonts: ^6.2.1
   image_picker: ^1.1.2
   shared_preferences: ^2.2.2
+  dynamic_color: ^1.6.6
+  http: ^1.4.0
+  flutter_secure_storage: ^9.2.4
 
 dependency_overrides:
   flutter_web_auth_2: ^4.1.0
