@@ -1,12 +1,14 @@
 # AuraAscend
 
 **Fix you damn life.**
+
 AuraAscend is the only self-improvement app you'll ever need. Earn Aura for every good thing you do. Prove it with AI, a timer, or just your honesty.
+
 Get it now through [GitHub actions](https://github.com/NiceSapien/AuraAscend/actions).
 
 ## Self-hosting
 
-If you wish to self-host AuraAscend for some reason, you'll have to clone the [backend](https://github.com/NiceSapien) repository aswell, written in ExpressJS. The instructions to setup the backend are present in the repository readme.
+If you wish to self-host AuraAscend for some reason, you'll have to clone the [backend](https://github.com/NiceSapien/AuraAscend-backend) repository aswell, written in ExpressJS. The instructions to setup the backend are present in the repository readme.
 
 To setup the frontend:
 
@@ -30,21 +32,31 @@ flutter build apk --debug
 There's not much about contributing yet. Make sure to deploy your own backend and not use our API link for testing. After you're done, revert it back to ours and make a pull request. Here's how you may make commits:
 
 `feat`: For new features
+
 `improve`: For improvement of existing features
+
 `fix`: For bug fixes
+
 `delete`: For deleting something
+
 `upgrade`: For upgrading/updating something, such as dependencies
+
 `docs`: Anything related to documentation and not to the codebase itself
+
 `refactor`: When refactoring some part of the codebase.
 
 ## Sponsors
 
 Currently, there are no sponsors.
-If you appreciate AuraAscend and want to keep it free for everyone, please sponsor me below.
 
-<iframe src="https://github.com/sponsors/NiceSapien/button" title="Sponsor NiceSapien" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
+If you appreciate AuraAscend and want to keep it free for everyone, please [Sponsor](https://github.com/sponsors/NiceSapien) me
+
+
 
 Current goals:
+
 Any amount - Show appreciation and help keep AuraAscend free
+
 20$ - Buy a domain for the website
+
 100$ - Publish AuraAscend on the Apple App Store
