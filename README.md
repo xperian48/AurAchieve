@@ -1,6 +1,6 @@
 # AuraAscend
 
-**Fix you damn life.**
+**Fix your damn life.**
 
 AuraAscend is the only self-improvement app you'll ever need. Earn Aura for every good thing you do. Prove it with AI, a timer, or just your honesty.
 
@@ -51,7 +51,7 @@ There's not much about contributing yet. Make sure to deploy your own backend an
 
 Currently, there are no sponsors.
 
-If you appreciate AuraAscend and want to keep it free for everyone, please [Sponsor](https://github.com/sponsors/NiceSapien) me.
+If you appreciate AuraAscend and want to keep it free for everyone, please [sponsor](https://github.com/sponsors/NiceSapien) me. The codebase is provided under the MIT license absolutely free of charge, forever.
 
 
 
