@@ -21,7 +21,9 @@ pub get && flutter pub get
 
 3. Edit lib/api_service.dart with your own backend URL. Do **not** use our API link!
 
-4. Build. That's all.
+4. Update lib/main.dart with you own appwrite project. Do **not** use our project ID!
+
+5. Build. That's all.
 
 ```bash
 flutter build apk --debug
@@ -49,7 +51,7 @@ There's not much about contributing yet. Make sure to deploy your own backend an
 
 Currently, there are no sponsors.
 
-If you appreciate AuraAscend and want to keep it free for everyone, please [Sponsor](https://github.com/sponsors/NiceSapien) me
+If you appreciate AuraAscend and want to keep it free for everyone, please [Sponsor](https://github.com/sponsors/NiceSapien) me.
 
 
 
@@ -57,6 +59,6 @@ Current goals:
 
 Any amount - Show appreciation and help keep AuraAscend free
 
-20$ - Buy a domain for the website
+**20$** - Buy a domain for the website
 
-100$ - Publish AuraAscend on the Apple App Store
+**100$** - Publish AuraAscend on the Apple App Store
