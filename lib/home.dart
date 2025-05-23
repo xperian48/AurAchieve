@@ -7,12 +7,18 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
+import 'package:app_usage/app_usage.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:async';
+import 'package:http/http.dart' as http;
 
 import 'stats.dart';
 import 'api_service.dart';
 import 'widgets/dynamic_color_svg.dart';
 import 'screens/auth_check_screen.dart';
 import 'timer_page.dart';
+
+enum AuraHistoryView { day, month, year }
 
 class HomePage extends StatefulWidget {
   final Account account;
@@ -78,16 +84,36 @@ class _HomePageState extends State<HomePage> {
   List<Task> completedTasks = [];
   int aura = 50;
   List<int> auraHistory = [50];
+  List<DateTime?> auraDates = [];
+  AuraHistoryView auraHistoryView = AuraHistoryView.day;
   Map<String, dynamic>? _userProfile;
+
+  List<DateTime?> auraDatesForView = [];
 
   late final ApiService _apiService;
   final _storage = const FlutterSecureStorage();
+
+  Timer? _socialTimer;
+  int _lastAuraLossCount = 0;
+  final List<String> _socialApps = [
+    'com.instagram.android',
+    'com.instagram.lite'
+        'com.zhiliaoapp.musically',
+    'com.google.android.youtube',
+    'com.facebook.katana',
+    'com.instagram.ios',
+    'com.zhiliaoapp.musically',
+    'com.google.ios.youtube',
+    'com.facebook.Facebook',
+  ];
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(account: widget.account);
     _initApp();
+    _initPushNotifications();
+    _startSocialMediaTracking();
   }
 
   Future<void> _initApp() async {
@@ -135,6 +161,16 @@ class _HomePageState extends State<HomePage> {
               auraHistory = auraHistory.sublist(auraHistory.length - 8);
             }
           }
+          auraDates =
+              completedTasks
+                  .map(
+                    (t) =>
+                        t.completedAt != null
+                            ? DateTime.tryParse(t.completedAt!)
+                            : null,
+                  )
+                  .where((d) => d != null)
+                  .toList();
         });
       }
     } catch (e) {
@@ -522,6 +558,119 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  List<int> getAuraHistoryForView() {
+    if (auraHistoryView == AuraHistoryView.day) return auraHistory;
+    if (auraHistoryView == AuraHistoryView.month) {
+      Map<String, int> monthMap = {};
+      Map<String, DateTime> monthDateMap = {};
+      for (int i = 0; i < auraDates.length; i++) {
+        final d = auraDates[i];
+        if (d == null) continue;
+        final key = "${d.year}-${d.month}";
+        monthMap[key] = auraHistory[i];
+        monthDateMap[key] = DateTime(d.year, d.month, 1);
+      }
+      auraDatesForView = monthDateMap.values.toList();
+      return monthMap.values.toList();
+    }
+    if (auraHistoryView == AuraHistoryView.year) {
+      Map<int, int> yearMap = {};
+      Map<int, DateTime> yearDateMap = {};
+      for (int i = 0; i < auraDates.length; i++) {
+        final d = auraDates[i];
+        if (d == null) continue;
+        yearMap[d.year] = auraHistory[i];
+        yearDateMap[d.year] = DateTime(d.year, 1, 1);
+      }
+      auraDatesForView = yearDateMap.values.toList();
+      return yearMap.values.toList();
+    }
+    return auraHistory;
+  }
+
+  List<DateTime?> getAuraDatesForView() {
+    if (auraHistoryView == AuraHistoryView.day) return auraDates;
+    return auraDatesForView;
+  }
+
+  void _initPushNotifications() async {
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+
+    String? token = await FirebaseMessaging.instance.getToken();
+    print("FCM Token: $token");
+
+    if (token != null && _userProfile != null) {
+      final String? currentUserId = _userProfile!['\$id'];
+      if (currentUserId != null) {
+        try {
+          Client client = Client();
+          client
+              .setEndpoint('https://682f3a3f3bf85ed00dba.fra.appwrite.run/v1')
+              .setProject('6800a2680008a268a6a3');
+
+          print('FCM token sent to Appwrite for user $currentUserId');
+        } catch (e) {
+          print('Error sending FCM token to Appwrite: $e');
+        }
+      }
+    }
+  }
+
+  void _startSocialMediaTracking() {
+    _socialTimer?.cancel();
+    _socialTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+      try {
+        DateTime now = DateTime.now();
+        DateTime start = now.subtract(const Duration(minutes: 10));
+        List<AppUsageInfo> infoList = await AppUsage().getAppUsage(start, now);
+        int totalMinutes = 0;
+        for (var info in infoList) {
+          if (_socialApps.contains(info.packageName)) {
+            totalMinutes += info.usage.inMinutes;
+          }
+        }
+        int auraLossCount = totalMinutes ~/ 1;
+        if (auraLossCount > _lastAuraLossCount) {
+          int loss = (auraLossCount - _lastAuraLossCount) * 5;
+          setState(() {
+            aura = (aura - loss).clamp(0, 9999);
+            auraHistory.add(aura);
+            if (auraHistory.length > 8) {
+              auraHistory = auraHistory.sublist(auraHistory.length - 8);
+            }
+            auraDates.add(DateTime.now());
+          });
+          _sendAuraLossPushNotification(loss);
+          _lastAuraLossCount = auraLossCount;
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _sendAuraLossPushNotification(int loss) async {
+    try {
+      await http.post(
+        Uri.parse('https://682f3a3f3bf85ed00dba.fra.appwrite.run/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'loss': loss, 'userId': _userProfile?['userId']}),
+      );
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _socialTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -554,7 +703,8 @@ class _HomePageState extends State<HomePage> {
                         aura: aura,
                         tasks:
                             tasks.where((t) => t.status == 'pending').toList(),
-                        auraHistory: auraHistory,
+                        auraHistory: getAuraHistoryForView(),
+                        auraDates: getAuraDatesForView(),
                         completedTasks: completedTasks,
                       ),
                 ),

@@ -6,6 +6,7 @@ class StatsPage extends StatelessWidget {
   final int aura;
   final List tasks;
   final List<int> auraHistory;
+  final List<DateTime?> auraDates;
   final List completedTasks;
 
   const StatsPage({
@@ -13,6 +14,7 @@ class StatsPage extends StatelessWidget {
     required this.aura,
     required this.tasks,
     required this.auraHistory,
+    required this.auraDates,
     required this.completedTasks,
   });
 
@@ -90,6 +92,7 @@ class StatsPage extends StatelessWidget {
               height: 200,
               child: _AuraLineChart(
                 auraTimeline: auraHistory,
+                auraDates: auraDates,
                 color: auraColor,
               ),
             ),
@@ -198,9 +201,39 @@ class _AuraMeter extends StatelessWidget {
 
 class _AuraLineChart extends StatelessWidget {
   final List<int> auraTimeline;
+  final List<DateTime?> auraDates;
   final Color color;
 
-  const _AuraLineChart({required this.auraTimeline, required this.color});
+  const _AuraLineChart({
+    required this.auraTimeline,
+    required this.auraDates,
+    required this.color,
+  });
+
+  String _formatDate(DateTime? date, bool isLast) {
+    if (isLast) return "Now";
+    if (date == null) return "";
+
+    return "${_monthShort(date.month)} ${date.day}";
+  }
+
+  String _monthShort(int month) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return months[month - 1];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +261,10 @@ class _AuraLineChart extends StatelessWidget {
             children: List.generate(
               points,
               (i) => Text(
-                i == points - 1 ? "Now" : "Day ${points - i - 1}",
+                _formatDate(
+                  i < auraDates.length ? auraDates[i] : null,
+                  i == points - 1,
+                ),
                 style: GoogleFonts.gabarito(
                   fontSize: 12,
                   color: Colors.grey[700],
@@ -263,27 +299,34 @@ class _LineChartPainter extends CustomPainter {
           ..color = color
           ..style = PaintingStyle.fill;
 
-    final double dx = size.width / (data.length - 1);
+    final int n = data.length;
     final double chartHeight = size.height - 32;
+    final double chartWidth = size.width;
+
+    final double yRange =
+        (maxAura - minAura).abs() < 1e-6 ? 1 : (maxAura - minAura);
+    final double dx = n > 1 ? chartWidth / (n - 1) : 0;
 
     Path path = Path();
-    for (int i = 0; i < data.length; i++) {
-      double x = i * dx;
+    for (int i = 0; i < n; i++) {
+      double x = n > 1 ? i * dx : chartWidth / 2;
       double y =
-          chartHeight -
-          ((data[i] - minAura) /
-                  ((maxAura - minAura == 0) ? 1 : (maxAura - minAura))) *
-              chartHeight +
-          16;
+          chartHeight - ((data[i] - minAura) / yRange) * chartHeight + 16;
       if (i == 0) {
         path.moveTo(x, y);
       } else {
         path.lineTo(x, y);
       }
-
       canvas.drawCircle(Offset(x, y), 5, pointPaint);
     }
-    canvas.drawPath(path, paint);
+    if (n == 1) {
+      double x = chartWidth / 2;
+      double y =
+          chartHeight - ((data[0] - minAura) / yRange) * chartHeight + 16;
+      canvas.drawLine(Offset(x - 10, y), Offset(x + 10, y), paint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
   }
 
   @override

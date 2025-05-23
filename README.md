@@ -23,7 +23,9 @@ pub get && flutter pub get
 
 4. Update lib/main.dart with you own appwrite project. Do **not** use our project ID!
 
-5. Build. That's all.
+5. Setup firebase if you want push notifications and upload your `google-services.json` in `android/app` and `GoogleService-Info.plist` in `ios/Runner`.
+
+6. Build. That's all.
 
 ```bash
 flutter build apk --debug
@@ -51,7 +53,7 @@ There's not much about contributing yet. Make sure to deploy your own backend an
 
 Currently, there are no sponsors.
 
-If you appreciate AuraAscend and want to keep it free for everyone, please [sponsor](https://github.com/sponsors/NiceSapien) me. The codebase is provided under the MIT license absolutely free of charge, forever.
+If you appreciate AuraAscend and want to keep it free for everyone, please [sponsor](https://github.com/sponsors/NiceSapien) me. You can also do this through [patreon](https://patreon.com/nicesapien), but GitHub sponsors is preferred over Patreon as it charges less. The codebase is provided under the MIT license absolutely free of charge, forever.
 
 
 
