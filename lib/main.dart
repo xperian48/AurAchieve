@@ -6,12 +6,20 @@ import 'package:appwrite/models.dart' as models;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart' as perm_handler;
+import 'dart:io' show Platform;
+import 'package:android_intent_plus/android_intent.dart';
+
 import 'theme.dart';
 import 'home.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   Client client = Client();
   client
       .setEndpoint('https://fra.cloud.appwrite.io/v1')
@@ -213,7 +221,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
       if (_featureController.hasClients) {
         _featureController.animateToPage(
           next,
-          duration: Duration(milliseconds: 400),
+          duration: const Duration(milliseconds: 400),
           curve: Curves.easeInOut,
         );
       }
@@ -221,13 +229,145 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   }
 
   void showError(String msg) {
+    if (!mounted) return;
     setState(() => error = msg);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Colors.red.shade400),
     );
   }
 
+  Future<void> _handleSuccessfulAuth() async {
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final bool permissionsExplained =
+        prefs.getBool('permissions_explained_v1') ?? false;
+
+    if (!permissionsExplained) {
+      if (Platform.isAndroid) {
+        await _showUsageStatsExplanationDialog();
+      }
+      await _showBackgroundAccessExplanationDialog();
+      await prefs.setBool('permissions_explained_v1', true);
+    }
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomePage(account: widget.account),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showUsageStatsExplanationDialog() async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(
+            "Usage Data Access",
+            style: Theme.of(dialogContext).textTheme.titleLarge,
+          ),
+          content: Text(
+            "To track social media usage and help you manage your Aura, AuraAscend needs access to your app usage data. This data is processed locally on your device and is essential for the core functionality.",
+            style: Theme.of(dialogContext).textTheme.bodyMedium,
+          ),
+          actions: <Widget>[
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(dialogContext).colorScheme.primary,
+              ),
+              child: const Text("Later"),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.primary,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+              ),
+              child: const Text("Grant Permission"),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                if (Platform.isAndroid) {
+                  const AndroidIntent intent = AndroidIntent(
+                    action: 'android.settings.USAGE_ACCESS_SETTINGS',
+                  );
+                  try {
+                    await intent.launch();
+                  } catch (e) {
+                    print("Error launching usage access settings: $e");
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Could not open settings. Please enable manually via Android Settings > Apps > Special app access > Usage access.",
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+
+  Future<void> _showBackgroundAccessExplanationDialog() async {
+    if (!mounted || !Platform.isAndroid) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(
+            "Background Activity",
+            style: Theme.of(dialogContext).textTheme.titleLarge,
+          ),
+          content: Text(
+            "For AuraAscend to accurately monitor social media usage even when not actively open, please allow it to run in the background by disabling battery optimizations for the app. This helps ensure consistent Aura tracking.",
+            style: Theme.of(dialogContext).textTheme.bodyMedium,
+          ),
+          actions: <Widget>[
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(dialogContext).colorScheme.primary,
+              ),
+              child: const Text("Later"),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.primary,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+              ),
+              child: const Text("Adjust Settings"),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await perm_handler.Permission.ignoreBatteryOptimizations
+                    .request();
+              },
+            ),
+          ],
+        );
+      },
+    );
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+
   Future<void> register() async {
+    if (!mounted) return;
     setState(() => isBusy = true);
     try {
       await widget.account.create(
@@ -236,16 +376,26 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
         password: passwordController.text,
         name: nameController.text.trim(),
       );
-      await login();
+
+      await widget.account.createEmailPasswordSession(
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
+      final jwt = await widget.account.createJWT();
+      await _storage.write(key: 'jwt_token', value: jwt.jwt);
+      await _handleSuccessfulAuth();
     } catch (e) {
       showError(
         'Registration failed: ${e.toString().replaceAll('AppwriteException: ', '')}',
       );
+    }
+    if (mounted) {
       setState(() => isBusy = false);
     }
   }
 
   Future<void> login() async {
+    if (!mounted) return;
     setState(() => isBusy = true);
     try {
       await widget.account.createEmailPasswordSession(
@@ -254,15 +404,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
       );
       final jwt = await widget.account.createJWT();
       await _storage.write(key: 'jwt_token', value: jwt.jwt);
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomePage(account: widget.account),
-          ),
-        );
-      }
+      await _handleSuccessfulAuth();
     } catch (e) {
       showError(
         'Login failed: ${e.toString().replaceAll('AppwriteException: ', '')}',

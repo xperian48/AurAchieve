@@ -94,26 +94,43 @@ class _HomePageState extends State<HomePage> {
   final _storage = const FlutterSecureStorage();
 
   Timer? _socialTimer;
-  int _lastAuraLossCount = 0;
   final List<String> _socialApps = [
     'com.instagram.android',
-    'com.instagram.lite'
-        'com.zhiliaoapp.musically',
+    'com.instagram.lite',
+    'com.zhiliaoapp.musically',
     'com.google.android.youtube',
     'com.facebook.katana',
-    'com.instagram.ios',
-    'com.zhiliaoapp.musically',
-    'com.google.ios.youtube',
+    'com.twitter.android',
+    'com.snapchat.android',
+
+    'com.burbn.instagram',
+    'com.toyopagroup.picaboo',
+    'com.atebits.Tweetie2',
     'com.facebook.Facebook',
+    'com.google.ios.youtube',
   ];
+
+  String? _currentFcmToken;
+
+  DateTime _lastAppUsageCheckTime = DateTime.now();
+  int _cumulativeSocialMinutes = 0;
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(account: widget.account);
-    _initApp();
-    _initPushNotifications();
-    _startSocialMediaTracking();
+    _lastAppUsageCheckTime = DateTime.now();
+    _initializePageData();
+    if (Platform.isAndroid) {
+      _startSocialMediaTracking();
+    }
+  }
+
+  Future<void> _initializePageData() async {
+    await _initApp();
+    if (mounted) {
+      _initPushNotifications();
+    }
   }
 
   Future<void> _initApp() async {
@@ -140,6 +157,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final fetchedTasks = await _apiService.getTasks();
       final fetchedProfile = await _apiService.getUserProfile();
+      print("Debug: _fetchDataFromServer: fetchedProfile = $fetchedProfile");
 
       if (mounted) {
         setState(() {
@@ -153,8 +171,17 @@ class _HomePageState extends State<HomePage> {
                   .map((taskJson) => Task.fromJson(taskJson))
                   .where((task) => task.status == 'completed')
                   .toList();
-          _userProfile = fetchedProfile;
-          aura = fetchedProfile['aura'] ?? 50;
+
+          if (fetchedProfile != null) {
+            _userProfile = fetchedProfile;
+            aura = fetchedProfile['aura'] ?? 50;
+          } else {
+            print(
+              "Debug: _fetchDataFromServer: fetchedProfile was null, _userProfile not updated or set to null.",
+            );
+            _userProfile = null;
+          }
+
           if (auraHistory.isEmpty || auraHistory.last != aura) {
             auraHistory.add(aura);
             if (auraHistory.length > 8) {
@@ -173,11 +200,14 @@ class _HomePageState extends State<HomePage> {
                   .toList();
         });
       }
-    } catch (e) {
+    } catch (e, s) {
+      print("Debug: _fetchDataFromServer: Exception caught: $e");
+      print("Debug: _fetchDataFromServer: Stacktrace: $s");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error fetching data: ${e.toString()}')),
         );
+        _userProfile = null;
       }
     } finally {
       if (mounted) {
@@ -391,14 +421,21 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Delete Task?'),
+            title: Text(
+              'Delete Task?',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             content: Text(
               'Are you sure you want to delete "${taskToDelete.name}"?',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text('Cancel'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
+                child: const Text('Cancel'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
@@ -406,7 +443,7 @@ class _HomePageState extends State<HomePage> {
                   backgroundColor: Theme.of(context).colorScheme.error,
                   foregroundColor: Theme.of(context).colorScheme.onError,
                 ),
-                child: Text('Delete'),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -604,65 +641,145 @@ class _HomePageState extends State<HomePage> {
       sound: true,
     );
 
-    String? token = await FirebaseMessaging.instance.getToken();
-    print("FCM Token: $token");
+    String? token;
+    try {
+      token = await FirebaseMessaging.instance.getToken();
+      if (mounted) {
+        setState(() {
+          _currentFcmToken = token;
+        });
+      }
+    } catch (e, s) {
+      print("Debug: _initPushNotifications: Exception caught: $e");
+      print("Debug: _initPushNotifications: Stacktrace: $s");
+      if (mounted) {
+        setState(() {
+          _currentFcmToken = null;
+        });
+      }
+      return;
+    }
 
     if (token != null && _userProfile != null) {
-      final String? currentUserId = _userProfile!['\$id'];
+      final String? currentUserId = _userProfile!['userId'];
       if (currentUserId != null) {
         try {
-          Client client = Client();
-          client
-              .setEndpoint('https://682f3a3f3bf85ed00dba.fra.appwrite.run/v1')
-              .setProject('6800a2680008a268a6a3');
+          Account authenticatedAccount = widget.account;
+          await authenticatedAccount.createPushTarget(
+            targetId: currentUserId,
+            identifier: token,
+            providerId: '682f36330001ecdab2e5',
+          );
 
-          print('FCM token sent to Appwrite for user $currentUserId');
+          print(
+            'FCM token $token successfully registered with Appwrite for user $currentUserId',
+          );
         } catch (e) {
-          print('Error sending FCM token to Appwrite: $e');
+          print('Error registering FCM token with Appwrite: $e');
+          if (e is AppwriteException) {
+            print(
+              'AppwriteException details: ${e.message}, code: ${e.code}, response: ${e.response}',
+            );
+          }
         }
+      } else {
+        print(
+          "User ID is null in _initPushNotifications, cannot register FCM token with Appwrite.",
+        );
       }
+    } else {
+      if (token == null) print("FCM token is null in _initPushNotifications.");
+      if (_userProfile == null)
+        print(
+          "_userProfile is null in _initPushNotifications, cannot get User ID for FCM registration.",
+        );
     }
   }
 
   void _startSocialMediaTracking() {
     _socialTimer?.cancel();
     _socialTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+      if (!Platform.isAndroid) {
+        _socialTimer?.cancel();
+        return;
+      }
       try {
         DateTime now = DateTime.now();
-        DateTime start = now.subtract(const Duration(minutes: 10));
-        List<AppUsageInfo> infoList = await AppUsage().getAppUsage(start, now);
-        int totalMinutes = 0;
+        List<AppUsageInfo> infoList = await AppUsage().getAppUsage(
+          _lastAppUsageCheckTime,
+          now,
+        );
+        _lastAppUsageCheckTime = now;
+
+        int minutesInThisInterval = 0;
         for (var info in infoList) {
           if (_socialApps.contains(info.packageName)) {
-            totalMinutes += info.usage.inMinutes;
+            minutesInThisInterval += info.usage.inMinutes;
           }
         }
-        int auraLossCount = totalMinutes ~/ 1;
-        if (auraLossCount > _lastAuraLossCount) {
-          int loss = (auraLossCount - _lastAuraLossCount) * 5;
-          setState(() {
-            aura = (aura - loss).clamp(0, 9999);
-            auraHistory.add(aura);
-            if (auraHistory.length > 8) {
-              auraHistory = auraHistory.sublist(auraHistory.length - 8);
-            }
-            auraDates.add(DateTime.now());
-          });
-          _sendAuraLossPushNotification(loss);
-          _lastAuraLossCount = auraLossCount;
+
+        if (minutesInThisInterval > 0) {
+          _cumulativeSocialMinutes += minutesInThisInterval;
         }
-      } catch (_) {}
+
+        if (_cumulativeSocialMinutes >= 15) {
+          _sendAuraLossPushNotification();
+          _cumulativeSocialMinutes = 0;
+
+          Timer(const Duration(seconds: 3), () {
+            if (mounted) {
+              _fetchDataFromServer();
+            }
+          });
+        }
+      } catch (e) {
+        print("Error in social media tracking (Android): $e");
+      }
     });
   }
 
-  void _sendAuraLossPushNotification(int loss) async {
+  void _sendAuraLossPushNotification() async {
+    final String? currentUserId = _userProfile?['userId'];
+
+    if (currentUserId == null) {
+      return;
+    }
+
+    if (_currentFcmToken == null) {
+      return;
+    }
+
+    final String? jwtToken = await _storage.read(key: 'jwt_token');
+
+    if (jwtToken == null) {
+      print("JWT token not found. Cannot send authenticated request.");
+      return;
+    }
+    print(jwtToken);
+
+    const String backendPushEndpoint =
+        "https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net/api/send-push-notification";
+
+    final Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $jwtToken',
+    };
+
+    final Map<String, dynamic> payload = {
+      'userId': currentUserId,
+      'fcmToken': _currentFcmToken,
+    };
+    final String body = jsonEncode(payload);
+
     try {
       await http.post(
-        Uri.parse('https://682f3a3f3bf85ed00dba.fra.appwrite.run/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'loss': loss, 'userId': _userProfile?['userId']}),
+        Uri.parse(backendPushEndpoint),
+        headers: headers,
+        body: body,
       );
-    } catch (_) {}
+    } catch (e) {
+      print("Failed to send push notification request: $e");
+    }
   }
 
   @override
@@ -779,27 +896,88 @@ class _HomePageState extends State<HomePage> {
                         horizontal: 24.0,
                         vertical: 12.0,
                       ),
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 18,
+                              ),
+                              textStyle: GoogleFonts.gabarito(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            onPressed: logout,
+                            icon: const Icon(Icons.logout_rounded),
+                            label: const Text('Sign Out'),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                            horizontal: 18,
+                          const SizedBox(height: 10),
+
+                          ElevatedButton(
+                            onPressed: () {
+                              print(
+                                "Test button pressed: Sending push notification with loss 10",
+                              );
+
+                              if (_userProfile == null ||
+                                  _userProfile!['userId'] == null) {
+                                print(
+                                  "Test Button DEBUG: _userProfile value is: $_userProfile. The check for User ID ('userId') failed.",
+                                );
+                                print(
+                                  "Test Button: User profile or User ID is not available. Cannot send notification.",
+                                );
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'User data not loaded yet. Please refresh or wait.',
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                              Timer(
+                                const Duration(seconds: 3),
+                                () => _sendAuraLossPushNotification(),
+                              );
+                              Timer(
+                                const Duration(seconds: 5),
+                                () => print("niger"),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orangeAccent,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 18,
+                              ),
+                            ),
+                            child: Text(
+                              'Test Push Notification (Loss 10)',
+                              style: GoogleFonts.gabarito(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                          textStyle: GoogleFonts.gabarito(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        onPressed: logout,
-                        icon: const Icon(Icons.logout_rounded),
-                        label: const Text('Sign Out'),
+                        ],
                       ),
                     ),
                   ),
