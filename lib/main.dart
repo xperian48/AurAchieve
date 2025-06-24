@@ -245,8 +245,8 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
     if (!permissionsExplained) {
       if (Platform.isAndroid) {
         await _showUsageStatsExplanationDialog();
+        await _showBackgroundAccessExplanationDialog();
       }
-      await _showBackgroundAccessExplanationDialog();
       await prefs.setBool('permissions_explained_v1', true);
     }
 
@@ -334,7 +334,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
             style: Theme.of(dialogContext).textTheme.titleLarge,
           ),
           content: Text(
-            "For AuraAscend to accurately monitor social media usage even when not actively open, please allow it to run in the background by disabling battery optimizations for the app. This helps ensure consistent Aura tracking.",
+            "For AuraAscend to accurately monitor social media usage and send reminders when not actively open, please allow it to run in the background by disabling battery optimizations. Don't worry - it's pretty light on the battery!",
             style: Theme.of(dialogContext).textTheme.bodyMedium,
           ),
           actions: <Widget>[
@@ -364,6 +364,62 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
       },
     );
     await Future.delayed(const Duration(milliseconds: 500));
+  }
+
+  Future<void> _showBackgroundAccessExplanationBottomSheet() async {
+    if (!mounted || !Platform.isAndroid) return;
+
+    bool granted =
+        await perm_handler.Permission.ignoreBatteryOptimizations.isGranted;
+    while (!granted) {
+      await showModalBottomSheet(
+        context: context,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (BuildContext dialogContext) {
+          return Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.battery_alert_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  "Background Activity Required",
+                  style: Theme.of(context).textTheme.titleLarge,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 12),
+                Text(
+                  "To accurately monitor social media usage and send reminders, AuraAscend needs to run in the background. Please disable battery optimizations for this app.",
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  child: const Text("Allow Background Access"),
+                  onPressed: () async {
+                    await perm_handler.Permission.ignoreBatteryOptimizations
+                        .request();
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      granted =
+          await perm_handler.Permission.ignoreBatteryOptimizations.isGranted;
+    }
   }
 
   Future<void> register() async {

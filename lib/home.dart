@@ -7,11 +7,11 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
-import 'package:app_usage/app_usage.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'social_blocker.dart';
 import 'stats.dart';
 import 'api_service.dart';
 import 'widgets/dynamic_color_svg.dart';
@@ -57,7 +57,7 @@ class Task {
 
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
-      id: json['\$id'] ?? '',
+      id: json[r'$id'] ?? '',
       name: json['name'] ?? 'Unnamed Task',
       intensity: json['intensity'] ?? 'easy',
       type: json['type'] ?? 'good',
@@ -66,7 +66,7 @@ class Task {
           json['durationMinutes'] is int
               ? json['durationMinutes']
               : (json['durationMinutes'] is String
-                  ? int.tryParse(json['durationMinutes']) ?? null
+                  ? int.tryParse(json['durationMinutes'])
                   : null),
       isImageVerifiable: json['isImageVerifiable'] ?? false,
       status: json['status'] ?? 'pending',
@@ -92,38 +92,13 @@ class _HomePageState extends State<HomePage> {
 
   late final ApiService _apiService;
   final _storage = const FlutterSecureStorage();
-
-  Timer? _socialTimer;
-  final List<String> _socialApps = [
-    'com.instagram.android',
-    'com.instagram.lite',
-    'com.zhiliaoapp.musically',
-    'com.google.android.youtube',
-    'com.facebook.katana',
-    'com.twitter.android',
-    'com.snapchat.android',
-
-    'com.burbn.instagram',
-    'com.toyopagroup.picaboo',
-    'com.atebits.Tweetie2',
-    'com.facebook.Facebook',
-    'com.google.ios.youtube',
-  ];
-
   String? _currentFcmToken;
-
-  DateTime _lastAppUsageCheckTime = DateTime.now();
-  int _cumulativeSocialMinutes = 0;
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(account: widget.account);
-    _lastAppUsageCheckTime = DateTime.now();
     _initializePageData();
-    if (Platform.isAndroid) {
-      _startSocialMediaTracking();
-    }
   }
 
   Future<void> _initializePageData() async {
@@ -172,15 +147,8 @@ class _HomePageState extends State<HomePage> {
                   .where((task) => task.status == 'completed')
                   .toList();
 
-          if (fetchedProfile != null) {
-            _userProfile = fetchedProfile;
-            aura = fetchedProfile['aura'] ?? 50;
-          } else {
-            print(
-              "Debug: _fetchDataFromServer: fetchedProfile was null, _userProfile not updated or set to null.",
-            );
-            _userProfile = null;
-          }
+          _userProfile = fetchedProfile;
+          aura = fetchedProfile['aura'] ?? 50;
 
           if (auraHistory.isEmpty || auraHistory.last != aura) {
             auraHistory.add(aura);
@@ -534,13 +502,13 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      if (apiCallResult != null && mounted) {
+      if (mounted) {
         await _fetchDataFromServer();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${apiCallResult['message'] ?? 'Task status updated.'} Aura change: ${apiCallResult['auraChange'] ?? 0}',
+              '${apiCallResult?['message'] ?? 'Task status updated.'} Aura change: ${apiCallResult?['auraChange'] ?? 0}',
             ),
             backgroundColor: Theme.of(context).colorScheme.primary,
           ),
@@ -668,7 +636,8 @@ class _HomePageState extends State<HomePage> {
           await authenticatedAccount.createPushTarget(
             targetId: currentUserId,
             identifier: token,
-            providerId: '682f36330001ecdab2e5',
+            providerId:
+                '682f36330001ecdab2e5', // Ensure this is your Appwrite FCM provider ID
           );
 
           print(
@@ -689,109 +658,23 @@ class _HomePageState extends State<HomePage> {
       }
     } else {
       if (token == null) print("FCM token is null in _initPushNotifications.");
-      if (_userProfile == null)
+      if (_userProfile == null) {
         print(
           "_userProfile is null in _initPushNotifications, cannot get User ID for FCM registration.",
         );
-    }
-  }
-
-  void _startSocialMediaTracking() {
-    _socialTimer?.cancel();
-    _socialTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
-      if (!Platform.isAndroid) {
-        _socialTimer?.cancel();
-        return;
       }
-      try {
-        DateTime now = DateTime.now();
-        List<AppUsageInfo> infoList = await AppUsage().getAppUsage(
-          _lastAppUsageCheckTime,
-          now,
-        );
-        _lastAppUsageCheckTime = now;
-
-        int minutesInThisInterval = 0;
-        for (var info in infoList) {
-          if (_socialApps.contains(info.packageName)) {
-            minutesInThisInterval += info.usage.inMinutes;
-          }
-        }
-
-        if (minutesInThisInterval > 0) {
-          _cumulativeSocialMinutes += minutesInThisInterval;
-        }
-
-        if (_cumulativeSocialMinutes >= 15) {
-          _sendAuraLossPushNotification();
-          _cumulativeSocialMinutes = 0;
-
-          Timer(const Duration(seconds: 3), () {
-            if (mounted) {
-              _fetchDataFromServer();
-            }
-          });
-        }
-      } catch (e) {
-        print("Error in social media tracking (Android): $e");
-      }
-    });
-  }
-
-  void _sendAuraLossPushNotification() async {
-    final String? currentUserId = _userProfile?['userId'];
-
-    if (currentUserId == null) {
-      return;
-    }
-
-    if (_currentFcmToken == null) {
-      return;
-    }
-
-    final String? jwtToken = await _storage.read(key: 'jwt_token');
-
-    if (jwtToken == null) {
-      print("JWT token not found. Cannot send authenticated request.");
-      return;
-    }
-    print(jwtToken);
-
-    const String backendPushEndpoint =
-        "https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net/api/send-push-notification";
-
-    final Map<String, String> headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $jwtToken',
-    };
-
-    final Map<String, dynamic> payload = {
-      'userId': currentUserId,
-      'fcmToken': _currentFcmToken,
-    };
-    final String body = jsonEncode(payload);
-
-    try {
-      await http.post(
-        Uri.parse(backendPushEndpoint),
-        headers: headers,
-        body: body,
-      );
-    } catch (e) {
-      print("Failed to send push notification request: $e");
     }
   }
 
   @override
   void dispose() {
-    _socialTimer?.cancel();
+    // ... existing dispose code ...
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -806,6 +689,22 @@ class _HomePageState extends State<HomePage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(
+              Icons.no_cell_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            tooltip: 'Social Media Blocker',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder:
+                      (context) =>
+                          SocialMediaBlockerScreen(apiService: _apiService),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(
               Icons.bar_chart_rounded,
@@ -922,65 +821,12 @@ class _HomePageState extends State<HomePage> {
                             label: const Text('Sign Out'),
                           ),
                           const SizedBox(height: 10),
-
-                          ElevatedButton(
-                            onPressed: () {
-                              print(
-                                "Test button pressed: Sending push notification with loss 10",
-                              );
-
-                              if (_userProfile == null ||
-                                  _userProfile!['userId'] == null) {
-                                print(
-                                  "Test Button DEBUG: _userProfile value is: $_userProfile. The check for User ID ('userId') failed.",
-                                );
-                                print(
-                                  "Test Button: User profile or User ID is not available. Cannot send notification.",
-                                );
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'User data not loaded yet. Please refresh or wait.',
-                                      ),
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                  );
-                                }
-                                return;
-                              }
-                              Timer(
-                                const Duration(seconds: 3),
-                                () => _sendAuraLossPushNotification(),
-                              );
-                              Timer(
-                                const Duration(seconds: 5),
-                                () => print("niger"),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orangeAccent,
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                                horizontal: 18,
-                              ),
-                            ),
-                            child: Text(
-                              'Test Push Notification (Loss 10)',
-                              style: GoogleFonts.gabarito(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
                   ),
+
+                  // ... Your existing SliverList for normal tasks ...
                   (tasks.where((t) => t.status == 'pending').toList().isEmpty)
                       ? SliverFillRemaining(
                         hasScrollBody: false,
@@ -989,15 +835,25 @@ class _HomePageState extends State<HomePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               DynamicColorSvg(
-                                assetName: 'assets/img/empty_tasks.svg',
+                                assetName:
+                                    'assets/img/empty_tasks.svg', // Ensure you have this asset
                                 height: 180,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                               const SizedBox(height: 24),
                               Text(
                                 'No active tasks.',
-                                style: GoogleFonts.roboto(
+                                style: GoogleFonts.gabarito(
                                   fontSize: 20,
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Add new tasks to get started.',
+                                style: GoogleFonts.gabarito(
+                                  fontSize: 16,
                                   color: Theme.of(context).colorScheme.outline,
                                 ),
                               ),
@@ -1026,7 +882,10 @@ class _HomePageState extends State<HomePage> {
                               vertical: 4,
                             ),
                             child: GestureDetector(
-                              onLongPress: () => _deleteTask(originalTaskIndex),
+                              onLongPress:
+                                  () => _deleteTask(
+                                    originalTaskIndex,
+                                  ), // Make sure originalTaskIndex is correct for the `tasks` list
                               child: Material(
                                 elevation: 2,
                                 borderRadius: BorderRadius.circular(18),
@@ -1053,7 +912,9 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                       );
                                     } else if (task.status == "pending") {
-                                      _completeTask(originalTaskIndex);
+                                      _completeTask(
+                                        originalTaskIndex,
+                                      ); // Make sure originalTaskIndex is correct
                                     }
                                   },
                                   shape: RoundedRectangleBorder(
@@ -1089,6 +950,7 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
       floatingActionButton: FloatingActionButton.extended(
+        // ... existing FAB code ...
         onPressed: _addTask,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Task'),

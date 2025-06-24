@@ -1,114 +1,118 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:appwrite/appwrite.dart'; // Assuming you might need Appwrite for user ID or JWT
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:appwrite/appwrite.dart';
 
 class ApiService {
   final String _baseUrl =
-      "https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net/api";
+      // 'http://10.0.2.2:3000'; // Android emulator localhost
+      // 'http://localhost:3000'; // iOS simulator/desktop localhost
+      'https://redesigned-robot-j9p7vgg64gp2r75-4000.app.github.dev'; // Prod
+  final Account account; // Appwrite account instance
   final _storage = const FlutterSecureStorage();
-  final Account account;
 
   ApiService({required this.account});
 
-  Future<String?> _getAuthToken() async {
-    String? token = await _storage.read(key: 'jwt_token');
-    if (token == null || _isJwtExpired(token)) {
-      try {
-        final jwt = await account.createJWT();
-        token = jwt.jwt;
-        await _storage.write(key: 'jwt_token', value: token);
-      } catch (e) {
-        await _storage.delete(key: 'jwt_token');
-        return null;
-      }
-    }
-    return token;
-  }
-
-  bool _isJwtExpired(String token) {
-    try {
-      final parts = token.split('.');
-      if (parts.length != 3) return true;
-      final payload = json.decode(
-        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
-      );
-      final exp = payload['exp'];
-      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      return exp is int ? exp < now : true;
-    } catch (_) {
-      return true;
-    }
+  Future<String?> _getJwtToken() async {
+    return await _storage.read(key: 'jwt_token');
   }
 
   Future<Map<String, String>> _getHeaders() async {
-    String? token = await _getAuthToken();
+    final token = await _getJwtToken();
+    if (token == null) {
+      // Handle missing token, perhaps by throwing an error or redirecting to login
+      print('JWT token not found for API request.');
+      throw Exception('Authentication token not found.');
+    }
     return {
       'Content-Type': 'application/json; charset=UTF-8',
-      if (token != null) 'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer $token',
     };
   }
 
   Future<Map<String, dynamic>> getUserProfile() async {
+    final headers = await _getHeaders();
     final response = await http.get(
-      Uri.parse('$_baseUrl/user/profile'),
-      headers: await _getHeaders(),
+      Uri.parse('$_baseUrl/api/user/profile'),
+      headers: headers,
     );
+
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception(
+      print(
         'Failed to load user profile: ${response.statusCode} ${response.body}',
       );
+      throw Exception('Failed to load user profile: ${response.body}');
     }
   }
 
   Future<List<dynamic>> getTasks() async {
+    final headers = await _getHeaders();
     final response = await http.get(
-      Uri.parse('$_baseUrl/tasks'),
-      headers: await _getHeaders(),
+      Uri.parse('$_baseUrl/api/tasks'),
+      headers: headers,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception(
-        'Failed to load tasks: ${response.statusCode} ${response.body}',
-      );
+      throw Exception('Failed to load tasks: ${response.body}');
     }
   }
 
   Future<Map<String, dynamic>> createTask({
     required String name,
-    required String taskCategory,
+    String intensity = 'easy',
+    String type = 'good',
+    String taskCategory = 'normal',
     int? durationMinutes,
+    bool isImageVerifiable = false,
   }) async {
-    final Map<String, dynamic> body = {
-      'name': name,
-      'taskCategory': taskCategory,
-    };
-    if (taskCategory == 'timed' && durationMinutes != null) {
-      body['durationMinutes'] = durationMinutes;
-    }
-
+    final headers = await _getHeaders();
     final response = await http.post(
-      Uri.parse('$_baseUrl/tasks'),
-      headers: await _getHeaders(),
-      body: jsonEncode(body),
+      Uri.parse('$_baseUrl/api/tasks'),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'intensity': intensity,
+        'type': type,
+        'taskCategory': taskCategory,
+        if (durationMinutes != null) 'durationMinutes': durationMinutes,
+        'isImageVerifiable': isImageVerifiable,
+      }),
     );
     if (response.statusCode == 201) {
       return jsonDecode(response.body);
     } else {
-      String errorMessage = 'Failed to create task';
-      String rawErrorBody = response.body;
-      print("Create Task API Error Body: $rawErrorBody");
-      try {
-        final errorBody = jsonDecode(response.body);
-        if (errorBody['message'] != null) {
-          errorMessage = errorBody['message'];
-        }
-      } catch (_) {}
+      throw Exception('Failed to create task: ${response.body}');
+    }
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    final headers = await _getHeaders();
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/api/tasks/$taskId'),
+      headers: headers,
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to delete task: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> completeNormalNonVerifiableTask(
+    String taskId,
+  ) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/tasks/$taskId/complete-normal-non-verifiable'),
+      headers: headers,
+      body: jsonEncode({'verificationType': 'honor'}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
       throw Exception(
-        '$errorMessage (Status: ${response.statusCode}, Body: $rawErrorBody)',
+        'Failed to complete normal non-verifiable task: ${response.body}',
       );
     }
   }
@@ -117,120 +121,131 @@ class ApiService {
     String taskId,
     String imageBase64,
   ) async {
+    final headers = await _getHeaders();
     final response = await http.post(
-      Uri.parse('$_baseUrl/tasks/$taskId/complete'),
-      headers: await _getHeaders(),
-      body: jsonEncode({'imageBase64': imageBase64}),
+      Uri.parse('$_baseUrl/api/tasks/$taskId/complete'),
+      headers: headers,
+      body: jsonEncode({
+        'verificationType': 'image',
+        'imageBase64': imageBase64,
+      }),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      String errorMessage = 'Failed to complete image verifiable task';
-      try {
-        final errorBody = jsonDecode(response.body);
-        if (errorBody['message'] != null) {
-          errorMessage = errorBody['message'];
-        }
-      } catch (_) {}
-      throw Exception('$errorMessage (Status: ${response.statusCode})');
-    }
-  }
-
-  Future<Map<String, dynamic>> completeNormalNonVerifiableTask(
-    String taskId,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/tasks/$taskId/complete-normal-non-verifiable'),
-      headers: await _getHeaders(),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      String errorMessage = 'Failed to complete non-verifiable task';
-      try {
-        final errorBody = jsonDecode(response.body);
-        if (errorBody['message'] != null) {
-          errorMessage = errorBody['message'];
-        }
-      } catch (_) {}
-      throw Exception('$errorMessage (Status: ${response.statusCode})');
-    }
-  }
-
-  Future<Map<String, dynamic>> completeTimedTask(
-    String taskId, {
-    int? actualDurationSpentMinutes,
-  }) async {
-    final Map<String, dynamic> body = {};
-    if (actualDurationSpentMinutes != null) {
-      body['actualDurationSpentMinutes'] = actualDurationSpentMinutes;
-    }
-
-    final response = await http.post(
-      Uri.parse('$_baseUrl/tasks/$taskId/complete-timed'),
-      headers: await _getHeaders(),
-
-      body: body.isNotEmpty ? jsonEncode(body) : null,
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      String errorMessage = 'Failed to complete timed task';
-      try {
-        final errorBody = jsonDecode(response.body);
-        if (errorBody['message'] != null) {
-          errorMessage = errorBody['message'];
-        }
-      } catch (_) {}
       throw Exception(
-        '$errorMessage (Status: ${response.statusCode}, Body: ${response.body})',
+        'Failed to complete normal image verifiable task: ${response.body}',
       );
     }
   }
 
   Future<Map<String, dynamic>> completeBadTask(String taskId) async {
+    final headers = await _getHeaders();
     final response = await http.post(
-      Uri.parse('$_baseUrl/tasks/$taskId/complete-bad'),
-      headers: await _getHeaders(),
+      Uri.parse('$_baseUrl/api/tasks/$taskId/complete-bad'),
+      headers: headers,
+      body: jsonEncode({'verificationType': 'bad_task_completion'}),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      String errorMessage = 'Failed to complete bad task';
-      try {
-        final errorBody = jsonDecode(response.body);
-        if (errorBody['message'] != null) {
-          errorMessage = errorBody['message'];
-        }
-      } catch (_) {}
-      throw Exception('$errorMessage (Status: ${response.statusCode})');
+      throw Exception('Failed to complete bad task: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> completeTimedTask(
+    String taskId, {
+    int? durationSpentMinutes, // Make this parameter optional (nullable)
+  }) async {
+    final headers = await _getHeaders();
+
+    // Create the body and only add duration if it's provided
+    final body = <String, dynamic>{'verificationType': 'timed_completion'};
+    if (durationSpentMinutes != null) {
+      body['durationSpentMinutes'] = durationSpentMinutes;
+    }
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/tasks/$taskId/complete-timed'),
+      headers: headers,
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to complete timed task: ${response.body}');
     }
   }
 
   Future<Map<String, dynamic>> markTaskAsBad(String taskId) async {
+    final headers = await _getHeaders();
     final response = await http.put(
-      Uri.parse('$_baseUrl/tasks/$taskId/mark-bad'),
-      headers: await _getHeaders(),
+      // Assuming PUT to update task type
+      Uri.parse('$_baseUrl/api/tasks/$taskId/mark-bad'),
+      headers: headers,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception(
-        'Failed to mark task as bad: ${response.statusCode} ${response.body}',
-      );
+      throw Exception('Failed to mark task as bad: ${response.body}');
     }
   }
 
-  Future<void> deleteTask(String taskId) async {
-    final response = await http.delete(
-      Uri.parse('$_baseUrl/tasks/$taskId'),
-      headers: await _getHeaders(),
+  Future<Map<String, dynamic>?> getSocialBlockerData() async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/social-blocker/get'),
+      headers: headers,
     );
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to delete task: ${response.statusCode} ${response.body}',
-      );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic> && data.isNotEmpty) {
+        return data;
+      }
+      return {}; // Blocker exists but has no data, treat as setup.
+    } else if (response.statusCode == 404) {
+      return null; // No blocker setup for this user.
+    } else {
+      throw Exception('Failed to get social blocker data: ${response.body}');
+    }
+  }
+
+  Future<void> setupSocialBlocker({
+    required int socialEndDays,
+    required String socialPassword,
+  }) async {
+    final headers = await _getHeaders();
+    final user = await account.get();
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/social-blocker'),
+      headers: headers,
+      body: jsonEncode({
+        'userId': user.$id,
+        'socialEnd': socialEndDays, // Sending number of days
+        'socialPassword': socialPassword,
+      }),
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to set up social blocker: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> completeSocialBlocker() async {
+    final headers = await _getHeaders();
+    final user = await account.get();
+    final response = await http.put(
+      Uri.parse('$_baseUrl/api/social-blocker/end'),
+      headers: headers,
+      body: jsonEncode({
+        'hasEnded': true,
+        'userId': user.$id,
+        'email': user.email,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to complete social blocker: ${response.body}');
     }
   }
 }

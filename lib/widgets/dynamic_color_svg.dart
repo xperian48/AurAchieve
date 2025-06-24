@@ -3,13 +3,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 class DynamicColorSvg extends StatelessWidget {
   const DynamicColorSvg({
-    Key? key,
+    super.key,
     required this.assetName,
     required this.color,
     this.width,
     this.height,
     this.fit = BoxFit.contain,
-  }) : super(key: key);
+  });
 
   final String assetName;
   final Color color;

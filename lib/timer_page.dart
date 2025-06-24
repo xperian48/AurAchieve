@@ -101,7 +101,7 @@ class _TimerPageState extends State<TimerPage> with TickerProviderStateMixin {
 
       final result = await widget.apiService.completeTimedTask(
         widget.task.id,
-        actualDurationSpentMinutes: actualDurationSpentMinutes,
+        durationSpentMinutes: actualDurationSpentMinutes,
       );
 
       Navigator.pop(context);
