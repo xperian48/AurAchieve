@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:appwrite/appwrite.dart'; // Assuming you might need Appwrite for user ID or JWT
+import 'package:appwrite/appwrite.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl =
-      // 'http://10.0.2.2:3000'; // Android emulator localhost
-      // 'http://localhost:3000'; // iOS simulator/desktop localhost
-      'https://redesigned-robot-j9p7vgg64gp2r75-4000.app.github.dev'; // Prod
-  final Account account; // Appwrite account instance
+      'https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net';
+  final Account account;
   final _storage = const FlutterSecureStorage();
 
   ApiService({required this.account});
@@ -20,7 +19,6 @@ class ApiService {
   Future<Map<String, String>> _getHeaders() async {
     final token = await _getJwtToken();
     if (token == null) {
-      // Handle missing token, perhaps by throwing an error or redirecting to login
       print('JWT token not found for API request.');
       throw Exception('Authentication token not found.');
     }
@@ -155,11 +153,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> completeTimedTask(
     String taskId, {
-    int? durationSpentMinutes, // Make this parameter optional (nullable)
+    int? durationSpentMinutes,
   }) async {
     final headers = await _getHeaders();
 
-    // Create the body and only add duration if it's provided
     final body = <String, dynamic>{'verificationType': 'timed_completion'};
     if (durationSpentMinutes != null) {
       body['durationSpentMinutes'] = durationSpentMinutes;
@@ -180,7 +177,6 @@ class ApiService {
   Future<Map<String, dynamic>> markTaskAsBad(String taskId) async {
     final headers = await _getHeaders();
     final response = await http.put(
-      // Assuming PUT to update task type
       Uri.parse('$_baseUrl/api/tasks/$taskId/mark-bad'),
       headers: headers,
     );
@@ -202,9 +198,9 @@ class ApiService {
       if (data is Map<String, dynamic> && data.isNotEmpty) {
         return data;
       }
-      return {}; // Blocker exists but has no data, treat as setup.
+      return {};
     } else if (response.statusCode == 404) {
-      return null; // No blocker setup for this user.
+      return null;
     } else {
       throw Exception('Failed to get social blocker data: ${response.body}');
     }
@@ -221,7 +217,7 @@ class ApiService {
       headers: headers,
       body: jsonEncode({
         'userId': user.$id,
-        'socialEnd': socialEndDays, // Sending number of days
+        'socialEnd': socialEndDays,
         'socialPassword': socialPassword,
       }),
     );
@@ -246,6 +242,37 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       throw Exception('Failed to complete social blocker: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> generateTimetable({
+    required List<Map<String, String>> chapters,
+    required DateTime deadline,
+  }) async {
+    final headers = await _getHeaders();
+    final startDate = DateTime.now();
+
+    final body = {
+      'timetable': {
+        'chapters': chapters,
+        'deadline': DateFormat('yyyy-MM-dd').format(deadline),
+        'startDate': DateFormat('yyyy-MM-dd').format(startDate),
+      },
+    };
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/timetable'),
+      headers: headers,
+      body: jsonEncode(body),
+    );
+
+    print('Timetable API Response Status: ${response.statusCode}');
+    print('Timetable API Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to generate timetable: ${response.body}');
     }
   }
 }

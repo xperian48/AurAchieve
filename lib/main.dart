@@ -8,15 +8,34 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart' as perm_handler;
 import 'dart:io' show Platform;
-import 'package:android_intent_plus/android_intent.dart';
+import 'package:flutter/services.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 import 'theme.dart';
 import 'home.dart';
 
+Future<void> _initializeTimezone() async {
+  tz_data.initializeTimeZones();
+  try {
+    final String localTimezone = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(localTimezone));
+    print("Timezone successfully set to: $localTimezone");
+  } catch (e) {
+    print("Could not get local timezone: $e");
+
+    tz.setLocalLocation(tz.getLocation('UTC'));
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  await _initializeTimezone();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -55,6 +74,22 @@ class MyApp extends StatelessWidget {
             useMaterial3: true,
           ),
           themeMode: ThemeMode.system,
+
+          builder: (context, child) {
+            final brightness = MediaQuery.of(context).platformBrightness;
+            final isDarkMode = brightness == Brightness.dark;
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle(
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarIconBrightness:
+                    isDarkMode ? Brightness.light : Brightness.dark,
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness:
+                    isDarkMode ? Brightness.light : Brightness.dark,
+              ),
+              child: child!,
+            );
+          },
           home: AuthCheck(account: account),
           debugShowCheckedModeBanner: false,
         );
@@ -238,17 +273,6 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
 
   Future<void> _handleSuccessfulAuth() async {
     if (!mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    final bool permissionsExplained =
-        prefs.getBool('permissions_explained_v1') ?? false;
-
-    if (!permissionsExplained) {
-      if (Platform.isAndroid) {
-        await _showUsageStatsExplanationDialog();
-        await _showBackgroundAccessExplanationDialog();
-      }
-      await prefs.setBool('permissions_explained_v1', true);
-    }
 
     if (mounted) {
       Navigator.pushReplacement(
@@ -257,168 +281,6 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
           builder: (context) => HomePage(account: widget.account),
         ),
       );
-    }
-  }
-
-  Future<void> _showUsageStatsExplanationDialog() async {
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(
-            "Usage Data Access",
-            style: Theme.of(dialogContext).textTheme.titleLarge,
-          ),
-          content: Text(
-            "To track social media usage and help you manage your Aura, AuraAscend needs access to your app usage data. This data is processed locally on your device and is essential for the core functionality.",
-            style: Theme.of(dialogContext).textTheme.bodyMedium,
-          ),
-          actions: <Widget>[
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(dialogContext).colorScheme.primary,
-              ),
-              child: const Text("Later"),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(dialogContext).colorScheme.primary,
-                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
-              ),
-              child: const Text("Grant Permission"),
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                if (Platform.isAndroid) {
-                  const AndroidIntent intent = AndroidIntent(
-                    action: 'android.settings.USAGE_ACCESS_SETTINGS',
-                  );
-                  try {
-                    await intent.launch();
-                  } catch (e) {
-                    print("Error launching usage access settings: $e");
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Could not open settings. Please enable manually via Android Settings > Apps > Special app access > Usage access.",
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-    await Future.delayed(const Duration(milliseconds: 500));
-  }
-
-  Future<void> _showBackgroundAccessExplanationDialog() async {
-    if (!mounted || !Platform.isAndroid) return;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(
-            "Background Activity",
-            style: Theme.of(dialogContext).textTheme.titleLarge,
-          ),
-          content: Text(
-            "For AuraAscend to accurately monitor social media usage and send reminders when not actively open, please allow it to run in the background by disabling battery optimizations. Don't worry - it's pretty light on the battery!",
-            style: Theme.of(dialogContext).textTheme.bodyMedium,
-          ),
-          actions: <Widget>[
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(dialogContext).colorScheme.primary,
-              ),
-              child: const Text("Later"),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(dialogContext).colorScheme.primary,
-                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
-              ),
-              child: const Text("Adjust Settings"),
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                await perm_handler.Permission.ignoreBatteryOptimizations
-                    .request();
-              },
-            ),
-          ],
-        );
-      },
-    );
-    await Future.delayed(const Duration(milliseconds: 500));
-  }
-
-  Future<void> _showBackgroundAccessExplanationBottomSheet() async {
-    if (!mounted || !Platform.isAndroid) return;
-
-    bool granted =
-        await perm_handler.Permission.ignoreBatteryOptimizations.isGranted;
-    while (!granted) {
-      await showModalBottomSheet(
-        context: context,
-        isDismissible: false,
-        enableDrag: false,
-        builder: (BuildContext dialogContext) {
-          return Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.battery_alert_rounded,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                SizedBox(height: 16),
-                Text(
-                  "Background Activity Required",
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  "To accurately monitor social media usage and send reminders, AuraAscend needs to run in the background. Please disable battery optimizations for this app.",
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 24),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                  child: const Text("Allow Background Access"),
-                  onPressed: () async {
-                    await perm_handler.Permission.ignoreBatteryOptimizations
-                        .request();
-                    Navigator.of(dialogContext).pop();
-                  },
-                ),
-              ],
-            ),
-          );
-        },
-      );
-      granted =
-          await perm_handler.Permission.ignoreBatteryOptimizations.isGranted;
     }
   }
 
@@ -439,6 +301,9 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
       );
       final jwt = await widget.account.createJWT();
       await _storage.write(key: 'jwt_token', value: jwt.jwt);
+
+      TextInput.finishAutofillContext();
+
       await _handleSuccessfulAuth();
     } catch (e) {
       showError(
@@ -612,87 +477,107 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   }
 
   Widget _signupForm() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Column(
-        children: [
-          TextField(
-            controller: nameController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-            decoration: InputDecoration(
-              labelText: 'Name',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+    return AutofillGroup(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: nameController,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: Icon(Icons.person_rounded),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 18,
+                ),
               ),
-              prefixIcon: Icon(Icons.person_rounded),
+              autofillHints: [AutofillHints.name],
+              textInputAction: TextInputAction.next,
             ),
-          ),
-          SizedBox(height: 16),
-          TextField(
-            controller: emailController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-            decoration: InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+            SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: Icon(Icons.email_rounded),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 18,
+                ),
               ),
-              prefixIcon: Icon(Icons.email_rounded),
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: [AutofillHints.username, AutofillHints.email],
+              textInputAction: TextInputAction.next,
             ),
-            keyboardType: TextInputType.emailAddress,
-          ),
-          SizedBox(height: 16),
-          TextField(
-            controller: passwordController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-            decoration: InputDecoration(
-              labelText: 'Password',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+            SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: Icon(Icons.lock_rounded),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 18,
+                ),
               ),
-              prefixIcon: Icon(Icons.lock_rounded),
+              obscureText: true,
+              autofillHints: [AutofillHints.newPassword],
+              textInputAction: TextInputAction.done,
             ),
-            obscureText: true,
-          ),
-          SizedBox(height: 24),
-          FilledButton.icon(
-            icon: Icon(Icons.person_add_alt_1_rounded),
-            onPressed: isBusy ? null : register,
-            label:
-                isBusy
-                    ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : Text(
-                      'Sign Up',
-                      style: GoogleFonts.gabarito(fontSize: 18),
-                    ),
-            style: FilledButton.styleFrom(
-              minimumSize: Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            SizedBox(height: 24),
+            FilledButton.icon(
+              icon: Icon(Icons.person_add_alt_1_rounded),
+              onPressed: isBusy ? null : register,
+              label:
+                  isBusy
+                      ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : Text(
+                        'Sign Up',
+                        style: GoogleFonts.gabarito(fontSize: 18),
+                      ),
+              style: FilledButton.styleFrom(
+                minimumSize: Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
-          ),
-          SizedBox(height: 12),
-          TextButton(
-            onPressed:
-                () => setState(() {
+            SizedBox(height: 12),
+            TextButton(
+              onPressed: () {
+                setState(() {
                   showSignup = false;
                   stopCarousel = false;
                   Future.microtask(_autoPlayFeatures);
-                }),
-            child: Text('Back', style: GoogleFonts.gabarito()),
-          ),
-        ],
+                });
+              },
+              child: Text('Back', style: GoogleFonts.gabarito()),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _loginForm() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+    return AutofillGroup(
       child: Column(
         children: [
           TextField(
@@ -706,6 +591,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
               prefixIcon: Icon(Icons.email_rounded),
             ),
             keyboardType: TextInputType.emailAddress,
+            autofillHints: [AutofillHints.username, AutofillHints.email],
           ),
           SizedBox(height: 16),
           TextField(
@@ -719,6 +605,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
               prefixIcon: Icon(Icons.lock_rounded),
             ),
             obscureText: true,
+            autofillHints: [AutofillHints.password],
           ),
           SizedBox(height: 24),
           FilledButton.icon(
@@ -741,12 +628,13 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
           ),
           SizedBox(height: 12),
           TextButton(
-            onPressed:
-                () => setState(() {
-                  showLogin = false;
-                  stopCarousel = false;
-                  Future.microtask(_autoPlayFeatures);
-                }),
+            onPressed: () {
+              setState(() {
+                showLogin = false;
+                stopCarousel = false;
+                Future.microtask(_autoPlayFeatures);
+              });
+            },
             child: Text('Back', style: GoogleFonts.gabarito()),
           ),
         ],

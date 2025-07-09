@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'social_blocker.dart';
 import 'stats.dart';
@@ -17,6 +18,7 @@ import 'api_service.dart';
 import 'widgets/dynamic_color_svg.dart';
 import 'screens/auth_check_screen.dart';
 import 'timer_page.dart';
+import 'study_planner.dart';
 
 enum AuraHistoryView { day, month, year }
 
@@ -87,6 +89,14 @@ class _HomePageState extends State<HomePage> {
   List<DateTime?> auraDates = [];
   AuraHistoryView auraHistoryView = AuraHistoryView.day;
   Map<String, dynamic>? _userProfile;
+  int _selectedIndex = 0;
+  bool _isTimetableSetupInProgress = true;
+
+  bool _showAllTasks = false;
+  bool _showAllStudyTasks = false;
+  List<Map<String, dynamic>> _todaysStudyPlan = [];
+  List<Subject> _subjects = [];
+  bool _isStudyPlanSetupComplete = false;
 
   List<DateTime?> auraDatesForView = [];
 
@@ -112,6 +122,7 @@ class _HomePageState extends State<HomePage> {
     setState(() => isLoading = true);
     await _loadUserName();
     await _fetchDataFromServer();
+    await _loadStudyPlanData();
     if (mounted) setState(() => isLoading = false);
   }
 
@@ -123,6 +134,54 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       if (mounted) setState(() => userName = "User");
+    }
+  }
+
+  Future<void> _loadStudyPlanData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isSetupComplete = prefs.getBool('studyPlannerSetupComplete') ?? false;
+
+    if (mounted) {
+      setState(() {
+        _isStudyPlanSetupComplete = isSetupComplete;
+      });
+    }
+
+    if (!isSetupComplete) return;
+
+    final subjectsJson = prefs.getStringList('studyPlannerSubjects') ?? [];
+    final subjects =
+        subjectsJson.map((s) => Subject.fromJson(json.decode(s))).toList();
+
+    final timetableJson = prefs.getString('studyPlannerData');
+    if (timetableJson != null) {
+      final decoded = json.decode(timetableJson) as List;
+      final fullSchedule =
+          decoded
+              .map(
+                (e) => {
+                  'date': DateTime.parse(e['date']),
+                  'tasks':
+                      (e['tasks'] as List)
+                          .map((t) => Map<String, dynamic>.from(t))
+                          .toList(),
+                },
+              )
+              .toList();
+
+      final today = DateUtils.dateOnly(DateTime.now());
+      final todaySchedule = fullSchedule.firstWhere(
+        (d) => DateUtils.isSameDay(d['date'] as DateTime, today),
+        orElse: () => {'tasks': []},
+      );
+
+      if (mounted) {
+        setState(() {
+          _subjects = subjects;
+          _todaysStudyPlan =
+              todaySchedule['tasks'] as List<Map<String, dynamic>>;
+        });
+      }
     }
   }
 
@@ -387,34 +446,42 @@ class _HomePageState extends State<HomePage> {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Delete Task?',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            content: Text(
-              'Are you sure you want to delete "${taskToDelete.name}"?',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                ),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
-                ),
-                child: const Text('Delete'),
-              ),
-            ],
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final textColor = isDark ? Colors.white : Colors.black87;
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: Text(
+            'Delete Task?',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: textColor),
           ),
+          content: Text(
+            'Are you sure you want to delete "${taskToDelete.name}"?',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: textColor),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.primary,
+              ),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
     );
     if (confirm == true) {
       try {
@@ -636,8 +703,7 @@ class _HomePageState extends State<HomePage> {
           await authenticatedAccount.createPushTarget(
             targetId: currentUserId,
             identifier: token,
-            providerId:
-                '682f36330001ecdab2e5', // Ensure this is your Appwrite FCM provider ID
+            providerId: '682f36330001ecdab2e5',
           );
 
           print(
@@ -666,14 +732,39 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _updateTimetableSetupState(bool isComplete) {
+    if (mounted) {
+      setState(() {
+        _isTimetableSetupInProgress = !isComplete;
+      });
+
+      if (isComplete) {
+        _loadStudyPlanData();
+      } else {
+        setState(() {
+          _isStudyPlanSetupComplete = false;
+          _todaysStudyPlan = [];
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
-    // ... existing dispose code ...
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> _widgetOptions = <Widget>[
+      _buildDashboardView(),
+      SocialMediaBlockerScreen(apiService: _apiService),
+      StudyPlannerScreen(
+        onSetupStateChanged: _updateTimetableSetupState,
+        apiService: _apiService,
+      ),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -689,22 +780,6 @@ class _HomePageState extends State<HomePage> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.no_cell_rounded,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            tooltip: 'Social Media Blocker',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder:
-                      (context) =>
-                          SocialMediaBlockerScreen(apiService: _apiService),
-                ),
-              );
-            },
-          ),
           IconButton(
             icon: Icon(
               Icons.bar_chart_rounded,
@@ -729,45 +804,47 @@ class _HomePageState extends State<HomePage> {
           ),
           IconButton(
             icon: Icon(
-              Icons.refresh_rounded,
-              color: Theme.of(context).colorScheme.primary,
+              Icons.logout_rounded,
+              color: Theme.of(context).colorScheme.error,
             ),
-            onPressed: _fetchDataFromServer,
-            tooltip: 'Refresh Data',
+            onPressed: logout,
+            tooltip: 'Sign Out',
           ),
         ],
       ),
       body:
           isLoading
-              ? Center(child: CircularProgressIndicator())
-              : CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
-                      child: RichText(
-                        text: TextSpan(
-                          style: GoogleFonts.ebGaramond(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                          children: [
-                            const TextSpan(text: 'Hi, '),
-                            TextSpan(
-                              text: userName,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                children: [
+                  if (!(_selectedIndex == 2 && _isTimetableSetupInProgress))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.ebGaramond(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
-                            const TextSpan(text: '!'),
-                          ],
+                            children: [
+                              const TextSpan(text: 'Hi, '),
+                              TextSpan(
+                                text: userName,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              const TextSpan(text: '!'),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
+                  if (!(_selectedIndex == 2 && _isTimetableSetupInProgress))
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Row(
                         children: [
@@ -788,176 +865,369 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24.0,
-                        vertical: 12.0,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.primary,
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.onPrimary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                                horizontal: 18,
-                              ),
-                              textStyle: GoogleFonts.gabarito(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            onPressed: logout,
-                            icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Sign Out'),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                      ),
+                  if (!(_selectedIndex == 2 && _isTimetableSetupInProgress))
+                    const SizedBox(height: 16),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: _widgetOptions,
                     ),
                   ),
-
-                  // ... Your existing SliverList for normal tasks ...
-                  (tasks.where((t) => t.status == 'pending').toList().isEmpty)
-                      ? SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              DynamicColorSvg(
-                                assetName:
-                                    'assets/img/empty_tasks.svg', // Ensure you have this asset
-                                height: 180,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(height: 24),
-                              Text(
-                                'No active tasks.',
-                                style: GoogleFonts.gabarito(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w500,
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Add new tasks to get started.',
-                                style: GoogleFonts.gabarito(
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                      : SliverList.separated(
-                        itemCount:
-                            tasks
-                                .where((t) => t.status == 'pending')
-                                .toList()
-                                .length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final pendingTasks =
-                              tasks
-                                  .where((t) => t.status == 'pending')
-                                  .toList();
-                          final task = pendingTasks[index];
-                          final originalTaskIndex = tasks.indexOf(task);
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18.0,
-                              vertical: 4,
-                            ),
-                            child: GestureDetector(
-                              onLongPress:
-                                  () => _deleteTask(
-                                    originalTaskIndex,
-                                  ), // Make sure originalTaskIndex is correct for the `tasks` list
-                              child: Material(
-                                elevation: 2,
-                                borderRadius: BorderRadius.circular(18),
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).colorScheme.surfaceContainerHigh,
-                                child: ListTile(
-                                  onTap: () {
-                                    if (task.taskCategory == "timed" &&
-                                        task.type == "good" &&
-                                        task.status == "pending") {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => TimerPage(
-                                                task: task,
-                                                apiService: _apiService,
-                                                onTaskCompleted: () {
-                                                  _fetchDataFromServer();
-                                                },
-                                              ),
-                                        ),
-                                      );
-                                    } else if (task.status == "pending") {
-                                      _completeTask(
-                                        originalTaskIndex,
-                                      ); // Make sure originalTaskIndex is correct
-                                    }
-                                  },
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  leading: _buildTaskIcon(task, context),
-                                  title: Text(
-                                    task.name,
-                                    style: GoogleFonts.gabarito(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  subtitle: _buildTaskSubtitle(task, context),
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 18,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant
-                                        .withOpacity(0.6),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
                 ],
               ),
-      floatingActionButton: FloatingActionButton.extended(
-        // ... existing FAB code ...
-        onPressed: _addTask,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Task'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.no_cell_rounded),
+            label: 'Social Blocker',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.school_outlined),
+            label: 'Study Planner',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
+      floatingActionButton:
+          _selectedIndex == 0
+              ? FloatingActionButton.extended(
+                onPressed: _addTask,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add Task'),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              )
+              : null,
+    );
+  }
+
+  Widget _buildDashboardView() {
+    final pendingTasks = tasks.where((t) => t.status == 'pending').toList();
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 18.0,
+      ).copyWith(bottom: 80),
+      children: [
+        if (pendingTasks.isEmpty)
+          _buildEmptyTasksView()
+        else ...[
+          const SizedBox(height: 8),
+          Text(
+            'Your Tasks',
+            style: GoogleFonts.gabarito(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...pendingTasks.take(_showAllTasks ? pendingTasks.length : 5).map((
+            task,
+          ) {
+            final originalTaskIndex = tasks.indexOf(task);
+            return _buildTaskListItem(task, originalTaskIndex);
+          }),
+          if (pendingTasks.length > 5)
+            TextButton(
+              onPressed: () => setState(() => _showAllTasks = !_showAllTasks),
+              child: Text(_showAllTasks ? 'Show Less' : 'Show More...'),
+            ),
+        ],
+
+        if (_isStudyPlanSetupComplete) ...[
+          const Divider(height: 32),
+          Text(
+            "Today's Study Plan",
+            style: GoogleFonts.gabarito(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_todaysStudyPlan.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Text("Nothing scheduled for today. Enjoy your break!"),
+            )
+          else ...[
+            ..._todaysStudyPlan
+                .take(_showAllStudyTasks ? _todaysStudyPlan.length : 3)
+                .map((task) => _buildStudyPlanTile(task)),
+            if (_todaysStudyPlan.length > 3)
+              TextButton(
+                onPressed:
+                    () => setState(
+                      () => _showAllStudyTasks = !_showAllStudyTasks,
+                    ),
+                child: Text(_showAllStudyTasks ? 'Show Less' : 'Show More...'),
+              ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTaskListItem(Task task, int originalTaskIndex) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: GestureDetector(
+        onLongPress: () => _deleteTask(originalTaskIndex),
+        child: Material(
+          elevation: 2,
+          borderRadius: BorderRadius.circular(18),
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          child: ListTile(
+            onTap: () {
+              if (task.taskCategory == "timed" &&
+                  task.type == "good" &&
+                  task.status == "pending") {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (_) => TimerPage(
+                          task: task,
+                          apiService: _apiService,
+                          onTaskCompleted: () {
+                            _fetchDataFromServer();
+                          },
+                        ),
+                  ),
+                );
+              } else if (task.status == "pending") {
+                _completeTask(originalTaskIndex);
+              }
+            },
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            leading: _buildTaskIcon(task, context),
+            title: Text(
+              task.name,
+              style: GoogleFonts.gabarito(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            subtitle: _buildTaskSubtitle(task, context),
+            trailing: Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 18,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withOpacity(0.6),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudyPlanTile(Map<String, dynamic> item) {
+    IconData icon;
+    String titleText;
+    String? subtitleText;
+    Color avatarColor;
+
+    switch (item['type']) {
+      case 'study':
+        final content = item['content'] as Map<String, dynamic>;
+        final subject = _subjects.firstWhere(
+          (s) => s.name == content['subject'],
+          orElse:
+              () => Subject(
+                name: 'Unknown',
+                icon: Icons.help,
+                color: Colors.grey,
+              ),
+        );
+        icon = subject.icon;
+        avatarColor = subject.color;
+        titleText = "Study: Ch. ${content['chapterNumber']}";
+        subtitleText = subject.name;
+        break;
+      case 'revision':
+        final content = item['content'] as Map<String, dynamic>;
+        final subject = _subjects.firstWhere(
+          (s) => s.name == content['subject'],
+          orElse:
+              () => Subject(
+                name: 'Unknown',
+                icon: Icons.help,
+                color: Colors.grey,
+              ),
+        );
+        icon = Icons.history_outlined;
+        avatarColor = subject.color.withOpacity(0.7);
+        titleText = "Revise: Ch. ${content['chapterNumber']}";
+        subtitleText = subject.name;
+        break;
+      default:
+        icon = Icons.self_improvement_outlined;
+        avatarColor = Theme.of(context).colorScheme.tertiaryContainer;
+        titleText = "Break Day";
+        subtitleText = "Relax and recharge!";
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: avatarColor,
+          child: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+        title: Text(titleText),
+        subtitle: subtitleText != null ? Text(subtitleText) : null,
+      ),
+    );
+  }
+
+  Widget _buildEmptyTasksView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          DynamicColorSvg(
+            assetName: 'assets/img/empty_tasks.svg',
+            height: 180,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No active tasks.',
+            style: GoogleFonts.gabarito(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add new tasks to get started.',
+            style: GoogleFonts.gabarito(
+              fontSize: 16,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTasksView() {
+    final pendingTasks = tasks.where((t) => t.status == 'pending').toList();
+    if (pendingTasks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DynamicColorSvg(
+              assetName: 'assets/img/empty_tasks.svg',
+              height: 180,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No active tasks.',
+              style: GoogleFonts.gabarito(
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add new tasks to get started.',
+              style: GoogleFonts.gabarito(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 80),
+      itemCount: pendingTasks.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final task = pendingTasks[index];
+        final originalTaskIndex = tasks.indexOf(task);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 4),
+          child: GestureDetector(
+            onLongPress: () => _deleteTask(originalTaskIndex),
+            child: Material(
+              elevation: 2,
+              borderRadius: BorderRadius.circular(18),
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              child: ListTile(
+                onTap: () {
+                  if (task.taskCategory == "timed" &&
+                      task.type == "good" &&
+                      task.status == "pending") {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (_) => TimerPage(
+                              task: task,
+                              apiService: _apiService,
+                              onTaskCompleted: () {
+                                _fetchDataFromServer();
+                              },
+                            ),
+                      ),
+                    );
+                  } else if (task.status == "pending") {
+                    _completeTask(originalTaskIndex);
+                  }
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                leading: _buildTaskIcon(task, context),
+                title: Text(
+                  task.name,
+                  style: GoogleFonts.gabarito(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                subtitle: _buildTaskSubtitle(task, context),
+                trailing: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 18,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

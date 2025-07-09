@@ -3,7 +3,9 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../api_service.dart';
 import '../widgets/dynamic_color_svg.dart';
 
@@ -25,12 +27,15 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
   bool _isChallengeFinished = false;
   bool _isTimeUp = false;
   bool _isCompleting = false;
+  bool _isPasswordVisible = false;
 
   String? _generatedPassword;
   String? _finishedPassword;
   DateTime? _timeoutDate;
   DateTime? _setupDate;
   int? _blockerDays;
+  tz.TZDateTime? _calculatedEndDate;
+  String? _durationErrorText;
 
   @override
   void initState() {
@@ -48,60 +53,48 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
   }
 
   Future<void> _loadBlockerState() async {
-    print("SOCIAL_BLOCKER: Checking blocker status...");
-    if (mounted) setState(() => _isLoading = true);
-
+    setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
-    final isFinished = prefs.getBool('sm_blocker_is_finished') ?? false;
+    final isFinished = prefs.getBool('socialBlockerFinished') ?? false;
 
     if (isFinished) {
-      print("SOCIAL_BLOCKER: Challenge is already finished. Showing result.");
-      if (mounted) {
-        setState(() {
-          _finishedPassword = prefs.getString('sm_blocker_finished_password');
-          _isChallengeFinished = true;
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _isChallengeFinished = true;
+        _finishedPassword = prefs.getString('socialBlockerPassword');
+        _isLoading = false;
+      });
       return;
     }
 
     try {
       final data = await widget.apiService.getSocialBlockerData();
 
-      // Case 1: Blocker is already set up on the server.
       if (data != null &&
           data.containsKey('socialEnd') &&
           data.containsKey('socialStart')) {
-        print(
-          "SOCIAL_BLOCKER: Existing setup found. Displaying progress view.",
-        );
         _timeoutDate = DateTime.parse(data['socialEnd']);
         _setupDate = DateTime.parse(data['socialStart']);
-        _generatedPassword = data['socialPassword'];
+        final activePassword = data['socialPassword'] as String?;
 
-        if (mounted) {
-          final now = DateTime.now();
-          final today = DateTime(now.year, now.month, now.day);
+        final isTimeUp = DateTime.now().isAfter(_timeoutDate!);
 
+        if (isTimeUp) {
+          setState(() {
+            _isChallengeFinished = true;
+            _finishedPassword = activePassword;
+            _isLoading = false;
+          });
+
+          _completeBlocker();
+        } else {
           setState(() {
             _isSetupComplete = true;
-            // Compare date parts only. Time is up if today is *after* the timeout date.
-            _isTimeUp = today.isAfter(_timeoutDate!);
+            _isTimeUp = false;
+            _generatedPassword = activePassword;
             _isLoading = false;
           });
         }
-
-        // If time is up, automatically call the completion logic.
-        // The server will handle not giving the reward twice.
-        if (_isTimeUp) {
-          print("SOCIAL_BLOCKER: Time is up. Completing challenge...");
-          await _completeBlocker();
-        }
-      }
-      // Case 2: No blocker is set up (API returned 404 or empty data).
-      else {
-        print("SOCIAL_BLOCKER: No setup found. Displaying onboarding view.");
+      } else {
         if (mounted) {
           setState(() {
             _isSetupComplete = false;
@@ -110,7 +103,6 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
         }
       }
     } catch (e) {
-      print("SOCIAL_BLOCKER: Error loading blocker state: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not load blocker data: $e')),
@@ -124,7 +116,6 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
   }
 
   Future<void> _completeBlocker() async {
-    // Prevent multiple calls
     if (_isCompleting || _isChallengeFinished) return;
 
     print("SOCIAL_BLOCKER: Completing challenge...");
@@ -151,11 +142,11 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
           ),
         );
         _confettiController.play();
-        // Set all final states at once to trigger switch to the finished view
+
         setState(() {
           _isChallengeFinished = true;
           _finishedPassword = finishedPassword;
-          _isCompleting = false; // Turn off spinner
+          _isCompleting = false;
         });
       }
     } catch (e) {
@@ -167,7 +158,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
             backgroundColor: Colors.red,
           ),
         );
-        // Ensure spinner is turned off on failure
+
         setState(() => _isCompleting = false);
       }
     }
@@ -187,10 +178,18 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
         socialPassword: _generatedPassword!,
       );
 
-      // No longer need to save to SharedPreferences.
-      final setupTime = DateTime.now();
-      // Set local dates for immediate UI update to progress view
-      final timeoutDate = setupTime.add(Duration(days: _blockerDays!));
+      final serverTimeZone = tz.getLocation('Asia/Kolkata');
+      final nowOnServer = tz.TZDateTime.now(serverTimeZone);
+      final setupTime = nowOnServer.toLocal();
+
+      final targetDate = nowOnServer.add(Duration(days: _blockerDays!));
+      final endDateOnServer = tz.TZDateTime(
+        serverTimeZone,
+        targetDate.year,
+        targetDate.month,
+        targetDate.day,
+      );
+      final timeoutDate = endDateOnServer.toLocal();
 
       setState(() {
         _isSetupComplete = true;
@@ -211,13 +210,16 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
+        final textColor = Theme.of(context).colorScheme.onSurface;
         return AlertDialog(
-          title: const Text('Restart Challenge?'),
-          content: const SingleChildScrollView(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: Text('Restart Challenge?', style: TextStyle(color: textColor)),
+          content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
                 Text(
                   'Please copy your current password before restarting. It will be permanently replaced with a new one and cannot be recovered.',
+                  style: TextStyle(color: textColor),
                 ),
               ],
             ),
@@ -278,10 +280,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
     if (_isChallengeFinished) {
       return _buildFinishedView();
@@ -311,38 +310,35 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
       },
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Setup Blocker"),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+    return Column(
+      children: [
+        Expanded(
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (page) => setState(() => _currentPage = page),
+            children: [
+              _buildFeaturePage(
+                features[0]['svg']!,
+                features[0]['title']!,
+                features[0]['desc']!,
+              ),
+              _buildFeaturePage(
+                features[1]['svg']!,
+                features[1]['title']!,
+                features[1]['desc']!,
+              ),
+              _buildFeaturePage(
+                features[2]['svg']!,
+                features[2]['title']!,
+                features[2]['desc']!,
+              ),
+              _buildDurationPickerPage(),
+              _buildPasswordPage(),
+            ],
+          ),
         ),
-      ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (page) => setState(() => _currentPage = page),
-        children: [
-          _buildFeaturePage(
-            features[0]['svg']!,
-            features[0]['title']!,
-            features[0]['desc']!,
-          ),
-          _buildFeaturePage(
-            features[1]['svg']!,
-            features[1]['title']!,
-            features[1]['desc']!,
-          ),
-          _buildFeaturePage(
-            features[2]['svg']!,
-            features[2]['title']!,
-            features[2]['desc']!,
-          ),
-          _buildDurationPickerPage(),
-          _buildPasswordPage(),
-        ],
-      ),
-      bottomNavigationBar: _buildNavigationControls(),
+        SafeArea(top: false, child: _buildNavigationControls()),
+      ],
     );
   }
 
@@ -370,6 +366,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                   style: GoogleFonts.gabarito(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -402,18 +399,51 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'For how many days do you want to block social media?',
             textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 24),
           TextField(
             onChanged: (value) {
+              final days = int.tryParse(value);
               setState(() {
-                _blockerDays = int.tryParse(value);
+                _blockerDays = days;
+                if (days != null) {
+                  if (days > 365) {
+                    _durationErrorText = 'Maximum 365 days';
+                    _calculatedEndDate = null;
+                  } else if (days > 0) {
+                    _durationErrorText = null;
+                    final serverTimeZone = tz.getLocation('Asia/Kolkata');
+                    final nowOnServer = tz.TZDateTime.now(serverTimeZone);
+                    final targetDate = nowOnServer.add(Duration(days: days));
+                    final endDateOnServer = tz.TZDateTime(
+                      serverTimeZone,
+                      targetDate.year,
+                      targetDate.month,
+                      targetDate.day,
+                    );
+                    final finalEndDate = tz.TZDateTime.from(
+                      endDateOnServer,
+                      tz.local,
+                    );
+                    _calculatedEndDate = finalEndDate;
+                  } else {
+                    _durationErrorText = null;
+                    _calculatedEndDate = null;
+                  }
+                } else {
+                  _durationErrorText = null;
+                  _calculatedEndDate = null;
+                }
               });
             },
             keyboardType: TextInputType.number,
@@ -422,20 +452,48 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 48,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: '7',
-              border: UnderlineInputBorder(),
+              border: const UnderlineInputBorder(),
               suffixText: 'days',
+              errorText: _durationErrorText,
+              hintStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(height: 24),
-          if ((_blockerDays ?? 0) > 0)
+          if ((_blockerDays ?? 0) > 0 && _durationErrorText == null)
             Text(
               'Approximate aura gain: $auraGain',
               style: GoogleFonts.gabarito(
                 fontSize: 16,
                 color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          if (_calculatedEndDate != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: Builder(
+                builder: (context) {
+                  final dt = _calculatedEndDate!;
+                  final localDateTime = DateTime(
+                    dt.year,
+                    dt.month,
+                    dt.day,
+                    dt.hour,
+                    dt.minute,
+                  );
+                  return Text(
+                    'Access will be restored on:\n${DateFormat.yMMMMEEEEd().add_jm().format(localDateTime)}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  );
+                },
               ),
             ),
         ],
@@ -459,12 +517,16 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             "Change your social media password to this and log out. Once your timeout ends, we'll show you the password again.",
             textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 12),
           Container(
@@ -478,6 +540,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
               style: GoogleFonts.sourceCodePro(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -513,25 +576,34 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                 },
                 child: const Text('Back'),
               )
-              : const SizedBox(width: 60), // Placeholder for alignment
+              : const SizedBox(width: 60),
           FilledButton(
             onPressed: () {
-              if (_currentPage == 3 &&
-                  (_blockerDays == null || _blockerDays! <= 0)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a valid number of days.'),
-                  ),
-                );
-                return;
+              if (_currentPage == 3) {
+                if (_blockerDays == null || _blockerDays! <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid number of days.'),
+                    ),
+                  );
+                  return;
+                }
+                if (_blockerDays! > 365) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Duration cannot exceed 365 days.'),
+                    ),
+                  );
+                  return;
+                }
               }
+
               if (_currentPage < 4) {
                 _pageController.nextPage(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.ease,
                 );
               } else {
-                // This is the only place _setupBlocker() is called from the UI
                 _setupBlocker();
               }
             },
@@ -565,16 +637,13 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
       }
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Social Media Lock")),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child:
-              _isTimeUp
-                  ? _buildCongratulationsView()
-                  : _buildInProgressView(progress, timeRemaining),
-        ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child:
+            _isTimeUp
+                ? _buildCongratulationsView()
+                : _buildInProgressView(progress, timeRemaining),
       ),
     );
   }
@@ -601,6 +670,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                   style: GoogleFonts.gabarito(
                     fontSize: 40,
                     fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -608,7 +678,13 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
           ),
         ),
         const SizedBox(height: 32),
-        Text(timeRemaining, style: GoogleFonts.gabarito(fontSize: 22)),
+        Text(
+          timeRemaining,
+          style: GoogleFonts.gabarito(
+            fontSize: 22,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
       ],
     );
   }
@@ -624,12 +700,16 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
           style: GoogleFonts.gabarito(
             fontSize: 24,
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           "You've completed the challenge. Here is your password:",
           textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 12),
         if (_isCompleting)
@@ -645,6 +725,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                     style: GoogleFonts.sourceCodePro(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -683,11 +764,10 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
     return Stack(
       alignment: Alignment.topCenter,
       children: [
-        Scaffold(
-          appBar: AppBar(title: const Text("Challenge Complete!")),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: SingleChildScrollView(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -702,49 +782,73 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                     style: GoogleFonts.gabarito(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     "You've completed the challenge. Here is your password:",
                     textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4.0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            _finishedPassword ?? "Error: No password found.",
-                            style: GoogleFonts.sourceCodePro(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Text(
+                              _isPasswordVisible
+                                  ? (_finishedPassword ?? "Loading...")
+                                  : '∗ ∗ ∗ ∗ ∗ ∗ ∗',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.sourceCodePro(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.copy),
-                            label: const Text('Copy Password'),
-                            onPressed:
-                                _finishedPassword == null
-                                    ? null
-                                    : () {
-                                      Clipboard.setData(
-                                        ClipboardData(text: _finishedPassword!),
-                                      );
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Password copied!'),
-                                        ),
-                                      );
-                                    },
+                          IconButton(
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isPasswordVisible = !_isPasswordVisible;
+                              });
+                            },
                           ),
                         ],
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Copy Password'),
+                    onPressed:
+                        _finishedPassword == null
+                            ? null
+                            : () {
+                              Clipboard.setData(
+                                ClipboardData(text: _finishedPassword!),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Password copied!'),
+                                ),
+                              );
+                            },
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
