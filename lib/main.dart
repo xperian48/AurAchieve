@@ -7,8 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -361,7 +359,9 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
           ),
           SizedBox(height: 8),
           Text(
-            isSignup ? 'Let\'s get you started.' : 'Continue your journey.',
+            isSignup
+                ? 'Can\'t wait to see a better you.'
+                : 'Glad to see you again!',
             style: GoogleFonts.roboto(
               fontSize: 18,
               color: Theme.of(context).colorScheme.secondary,
@@ -578,66 +578,72 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
 
   Widget _loginForm() {
     return AutofillGroup(
-      child: Column(
-        children: [
-          TextField(
-            controller: emailController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-            decoration: InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: emailController,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: Icon(Icons.email_rounded),
               ),
-              prefixIcon: Icon(Icons.email_rounded),
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: [AutofillHints.username, AutofillHints.email],
             ),
-            keyboardType: TextInputType.emailAddress,
-            autofillHints: [AutofillHints.username, AutofillHints.email],
-          ),
-          SizedBox(height: 16),
-          TextField(
-            controller: passwordController,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-            decoration: InputDecoration(
-              labelText: 'Password',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+            SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: Icon(Icons.lock_rounded),
               ),
-              prefixIcon: Icon(Icons.lock_rounded),
+              obscureText: true,
+              autofillHints: [AutofillHints.password],
             ),
-            obscureText: true,
-            autofillHints: [AutofillHints.password],
-          ),
-          SizedBox(height: 24),
-          FilledButton.icon(
-            icon: Icon(Icons.login_rounded),
-            onPressed: isBusy ? null : login,
-            label:
-                isBusy
-                    ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : Text('Login', style: GoogleFonts.gabarito(fontSize: 18)),
-            style: FilledButton.styleFrom(
-              minimumSize: Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            SizedBox(height: 24),
+            FilledButton.icon(
+              icon: Icon(Icons.login_rounded),
+              onPressed: isBusy ? null : login,
+              label:
+                  isBusy
+                      ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : Text(
+                        'Login',
+                        style: GoogleFonts.gabarito(fontSize: 18),
+                      ),
+              style: FilledButton.styleFrom(
+                minimumSize: Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
-          ),
-          SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                showLogin = false;
-                stopCarousel = false;
-                Future.microtask(_autoPlayFeatures);
-              });
-            },
-            child: Text('Back', style: GoogleFonts.gabarito()),
-          ),
-        ],
+            SizedBox(height: 12),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  showLogin = false;
+                  stopCarousel = false;
+                  Future.microtask(_autoPlayFeatures);
+                });
+              },
+              child: Text('Back', style: GoogleFonts.gabarito()),
+            ),
+          ],
+        ),
       ),
     );
   }

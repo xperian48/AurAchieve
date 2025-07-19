@@ -21,6 +21,9 @@ class SocialMediaBlockerScreen extends StatefulWidget {
 class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
   final PageController _pageController = PageController();
   late ConfettiController _confettiController;
+  final TextEditingController _durationController = TextEditingController(
+    text: '7',
+  );
   int _currentPage = 0;
   bool _isLoading = true;
   bool _isSetupComplete = false;
@@ -33,7 +36,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
   String? _finishedPassword;
   DateTime? _timeoutDate;
   DateTime? _setupDate;
-  int? _blockerDays;
+  int? _blockerDays = 7;
   tz.TZDateTime? _calculatedEndDate;
   String? _durationErrorText;
 
@@ -44,23 +47,43 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
       duration: const Duration(seconds: 10),
     );
     _loadBlockerState();
+    _calculateInitialEndDate();
   }
 
   @override
   void dispose() {
     _confettiController.dispose();
+    _durationController.dispose();
     super.dispose();
+  }
+
+  void _calculateInitialEndDate() {
+    if (_blockerDays == null || _blockerDays! <= 0) {
+      _calculatedEndDate = null;
+      return;
+    }
+    final serverTimeZone = tz.getLocation('Asia/Kolkata');
+    final nowOnServer = tz.TZDateTime.now(serverTimeZone);
+    final targetDate = nowOnServer.add(Duration(days: _blockerDays!));
+    final endDateOnServer = tz.TZDateTime(
+      serverTimeZone,
+      targetDate.year,
+      targetDate.month,
+      targetDate.day,
+    );
+    final finalEndDate = tz.TZDateTime.from(endDateOnServer, tz.local);
+    _calculatedEndDate = finalEndDate;
   }
 
   Future<void> _loadBlockerState() async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
-    final isFinished = prefs.getBool('socialBlockerFinished') ?? false;
+    final isFinished = prefs.getBool('sm_blocker_is_finished') ?? false;
 
     if (isFinished) {
       setState(() {
         _isChallengeFinished = true;
-        _finishedPassword = prefs.getString('socialBlockerPassword');
+        _finishedPassword = prefs.getString('sm_blocker_finished_password');
         _isLoading = false;
       });
       return;
@@ -78,22 +101,12 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
 
         final isTimeUp = DateTime.now().isAfter(_timeoutDate!);
 
-        if (isTimeUp) {
-          setState(() {
-            _isChallengeFinished = true;
-            _finishedPassword = activePassword;
-            _isLoading = false;
-          });
-
-          _completeBlocker();
-        } else {
-          setState(() {
-            _isSetupComplete = true;
-            _isTimeUp = false;
-            _generatedPassword = activePassword;
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _isSetupComplete = true;
+          _isTimeUp = isTimeUp;
+          _generatedPassword = activePassword;
+          _isLoading = false;
+        });
       } else {
         if (mounted) {
           setState(() {
@@ -213,12 +226,15 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
         final textColor = Theme.of(context).colorScheme.onSurface;
         return AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          title: Text('Restart Challenge?', style: TextStyle(color: textColor)),
+          title: Text(
+            'Start New Challenge?',
+            style: TextStyle(color: textColor),
+          ),
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
                 Text(
-                  'Please copy your current password before restarting. It will be permanently replaced with a new one and cannot be recovered.',
+                  'Please copy your current password before starting a new challenge. It will be permanently replaced and cannot be recovered.',
                   style: TextStyle(color: textColor),
                 ),
               ],
@@ -230,7 +246,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             FilledButton(
-              child: const Text('Restart Anyway'),
+              child: const Text('Start New'),
               onPressed: () {
                 Navigator.of(context).pop();
                 _resetBlocker();
@@ -255,7 +271,9 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
       _finishedPassword = null;
       _timeoutDate = null;
       _setupDate = null;
-      _blockerDays = null;
+      _blockerDays = 7;
+      _durationController.text = '7';
+      _calculateInitialEndDate();
       _currentPage = 0;
       if (_pageController.hasClients) {
         _pageController.jumpToPage(0);
@@ -412,6 +430,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
           ),
           const SizedBox(height: 24),
           TextField(
+            controller: _durationController,
             onChanged: (value) {
               final days = int.tryParse(value);
               setState(() {
@@ -455,9 +474,12 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
               color: Theme.of(context).colorScheme.onSurface,
             ),
             decoration: InputDecoration(
-              hintText: '7',
               border: const UnderlineInputBorder(),
               suffixText: 'days',
+              suffixStyle: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               errorText: _durationErrorText,
               hintStyle: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -705,57 +727,21 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          "You've completed the challenge. Here is your password:",
+          "You've completed the challenge. Press Finish to get your password and aura.",
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 24),
         if (_isCompleting)
           const CircularProgressIndicator()
         else
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    _generatedPassword ?? "...",
-                    style: GoogleFonts.sourceCodePro(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copy Password'),
-                    onPressed:
-                        _generatedPassword == null
-                            ? null
-                            : () {
-                              Clipboard.setData(
-                                ClipboardData(text: _generatedPassword!),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Password copied!'),
-                                ),
-                              );
-                            },
-                  ),
-                ],
-              ),
-            ),
+          FilledButton.icon(
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Finish Challenge'),
+            onPressed: _completeBlocker,
           ),
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          icon: const Icon(Icons.refresh),
-          label: const Text('Restart Challenge'),
-          onPressed: _showRestartDialog,
-        ),
       ],
     );
   }
@@ -853,7 +839,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                   const SizedBox(height: 24),
                   FilledButton.icon(
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Start New Challenge'),
+                    label: const Text('Finish & Start New'),
                     onPressed: _showRestartDialog,
                   ),
                 ],

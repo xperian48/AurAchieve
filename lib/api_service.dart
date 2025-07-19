@@ -229,7 +229,7 @@ class ApiService {
   Future<Map<String, dynamic>> completeSocialBlocker() async {
     final headers = await _getHeaders();
     final user = await account.get();
-    final response = await http.put(
+    final response = await http.post(
       Uri.parse('$_baseUrl/api/social-blocker/end'),
       headers: headers,
       body: jsonEncode({
@@ -245,19 +245,34 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> generateTimetable({
-    required List<Map<String, String>> chapters,
+  Future<Map<String, dynamic>?> getStudyPlan() async {
+    final headers = await _getHeaders();
+    final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/study-plan?clientDate=$clientDate'),
+      headers: headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else if (response.statusCode == 404) {
+      return null;
+    } else {
+      throw Exception('Failed to get study plan: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> generateTimetablePreview({
+    required Map<String, List<Map<String, String>>> chapters,
     required DateTime deadline,
   }) async {
     final headers = await _getHeaders();
-    final startDate = DateTime.now();
+    final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     final body = {
-      'timetable': {
-        'chapters': chapters,
-        'deadline': DateFormat('yyyy-MM-dd').format(deadline),
-        'startDate': DateFormat('yyyy-MM-dd').format(startDate),
-      },
+      'chapters': chapters,
+      'deadline': DateFormat('yyyy-MM-dd').format(deadline),
+      'clientDate': clientDate,
     };
 
     final response = await http.post(
@@ -266,13 +281,67 @@ class ApiService {
       body: jsonEncode(body),
     );
 
-    print('Timetable API Response Status: ${response.statusCode}');
-    print('Timetable API Response Body: ${response.body}');
-
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception('Failed to generate timetable: ${response.body}');
+      throw Exception('Failed to generate timetable preview: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> saveStudyPlan({
+    required List<Map<String, dynamic>> subjects,
+    required Map<String, List<Map<String, String>>> chapters,
+    required DateTime deadline,
+    required List<Map<String, dynamic>> timetable,
+  }) async {
+    final headers = await _getHeaders();
+
+    final body = {
+      'subjects': subjects,
+      'chapters': chapters,
+      'deadline': DateFormat('yyyy-MM-dd').format(deadline),
+      'timetable': timetable,
+    };
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/study-plan'),
+      headers: headers,
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to save study plan: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> completeStudyPlanTask(
+    String taskId,
+    String dateOfTask,
+  ) async {
+    final headers = await _getHeaders();
+    final clientDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/study-plan/tasks/$taskId/complete'),
+      headers: headers,
+      body: jsonEncode({'clientDate': clientDate, 'dateOfTask': dateOfTask}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to complete task: ${response.body}');
+    }
+  }
+
+  Future<void> deleteStudyPlan() async {
+    final headers = await _getHeaders();
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/api/study-plan'),
+      headers: headers,
+    );
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete study plan: ${response.body}');
     }
   }
 }

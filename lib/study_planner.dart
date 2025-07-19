@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
@@ -31,7 +29,6 @@ class Subject {
         fontFamily: json['icon_font_family'],
         fontPackage: json['icon_font_package'],
       ),
-
       color: Color(json['color_value'] ?? Colors.blue.value),
     );
   }
@@ -57,11 +54,13 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   bool _isSetupComplete = false;
   bool _isLoading = true;
   bool _isGenerating = false;
+  bool _isSaving = false;
 
   List<Subject> _subjects = [];
   Map<String, List<Map<String, String>>> _chapters = {};
   DateTime? _deadline;
   List<Map<String, dynamic>> _generatedTimetable = [];
+  Map<String, dynamic>? _studyPlan;
 
   final TextEditingController _subjectController = TextEditingController();
   IconData _currentSubjectIcon = Icons.subject;
@@ -122,17 +121,22 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   }
 
   Future<void> _loadTimetableData() async {
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _isSetupComplete = prefs.getBool('studyPlannerSetupComplete') ?? false;
-      if (_isSetupComplete) {
-        final subjectsJson = prefs.getStringList('studyPlannerSubjects') ?? [];
-        _subjects =
-            subjectsJson.map((s) => Subject.fromJson(json.decode(s))).toList();
+      _isLoading = true;
+    });
+    try {
+      final plan = await widget.apiService.getStudyPlan();
+      if (plan != null) {
+        setState(() {
+          _studyPlan = plan;
+          _isSetupComplete = true;
+          final subjectsJson = plan['subjects'] as List;
+          _subjects =
+              subjectsJson
+                  .map((s) => Subject.fromJson(s as Map<String, dynamic>))
+                  .toList();
 
-        final chaptersJson = prefs.getString('studyPlannerChapters');
-        if (chaptersJson != null) {
-          _chapters = (json.decode(chaptersJson) as Map<String, dynamic>).map(
+          _chapters = (plan['chapters'] as Map<String, dynamic>).map(
             (key, value) => MapEntry(
               key,
               (value as List)
@@ -140,20 +144,15 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                   .toList(),
             ),
           );
-        }
-        final deadlineString = prefs.getString('studyPlannerDeadline');
-        if (deadlineString != null) {
-          _deadline = DateTime.tryParse(deadlineString);
-        }
 
-        final timetableJson = prefs.getString('studyPlannerData');
-        if (timetableJson != null) {
-          final decoded = json.decode(timetableJson) as List;
+          _deadline = DateTime.tryParse(plan['deadline']);
+
+          final timetableJson = plan['timetable'] as List;
           _generatedTimetable =
-              decoded
+              timetableJson
                   .map(
                     (e) => {
-                      'date': DateTime.parse(e['date']),
+                      'date': (e['date'] as String),
                       'tasks':
                           (e['tasks'] as List)
                               .map((t) => Map<String, dynamic>.from(t))
@@ -161,43 +160,28 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                     },
                   )
                   .toList();
-        }
+        });
+      } else {
+        setState(() {
+          _isSetupComplete = false;
+        });
       }
-      _isLoading = false;
-    });
-    widget.onSetupStateChanged(_isSetupComplete);
-  }
-
-  Future<void> _saveAndFinish() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('studyPlannerSetupComplete', true);
-    final subjectsJson = _subjects.map((s) => json.encode(s.toJson())).toList();
-    await prefs.setStringList('studyPlannerSubjects', subjectsJson);
-    await prefs.setString('studyPlannerChapters', json.encode(_chapters));
-    if (_deadline != null) {
-      await prefs.setString(
-        'studyPlannerDeadline',
-        _deadline!.toIso8601String(),
-      );
+    } catch (e) {
+      print('Error loading study plan: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load study plan: $e')),
+        );
+      }
+      setState(() {
+        _isSetupComplete = false;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+      widget.onSetupStateChanged(_isSetupComplete);
     }
-
-    final timetableToSave =
-        _generatedTimetable
-            .map(
-              (day) => {
-                'date': (day['date'] as DateTime).toIso8601String(),
-                'tasks': day['tasks'],
-              },
-            )
-            .toList();
-    await prefs.setString('studyPlannerData', json.encode(timetableToSave));
-
-    await _loadTimetableData();
-
-    setState(() {
-      _isSetupComplete = true;
-    });
-    widget.onSetupStateChanged(true);
   }
 
   Future<void> _resetTimetable() async {
@@ -205,9 +189,17 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Reset Study Plan?'),
-            content: const Text(
+            title: Text(
+              'Reset Study Plan?',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            content: Text(
               'Are you sure you want to delete your current study plan and start over? This action cannot be undone.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             actions: [
               TextButton(
@@ -226,22 +218,25 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     );
 
     if (confirm == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('studyPlannerSetupComplete');
-      await prefs.remove('studyPlannerSubjects');
-      await prefs.remove('studyPlannerChapters');
-      await prefs.remove('studyPlannerDeadline');
-      await prefs.remove('studyPlannerData');
-
-      setState(() {
-        _isSetupComplete = false;
-        _subjects.clear();
-        _chapters.clear();
-        _deadline = null;
-        _generatedTimetable.clear();
-        _currentPage = 0;
-      });
-      widget.onSetupStateChanged(false);
+      try {
+        await widget.apiService.deleteStudyPlan();
+        setState(() {
+          _isSetupComplete = false;
+          _subjects.clear();
+          _chapters.clear();
+          _deadline = null;
+          _generatedTimetable.clear();
+          _studyPlan = null;
+          _currentPage = 0;
+        });
+        widget.onSetupStateChanged(false);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Failed to reset plan: $e')));
+        }
+      }
     }
   }
 
@@ -281,18 +276,38 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   }
 
   void _showChapterPicker(String subject) async {
+
+    final existingChapterNumbers =
+        _chapters[subject]
+            ?.map((chap) => int.tryParse(chap['number']!))
+            .where((num) => num != null)
+            .cast<int>()
+            .toSet() ??
+        {};
+
     final selectedNumbers = await showDialog<Set<int>>(
       context: context,
-      builder: (context) => const ChapterPickerDialog(),
+      builder:
+          (context) =>
+              ChapterPickerDialog(initialChapters: existingChapterNumbers),
     );
 
-    if (selectedNumbers != null && selectedNumbers.isNotEmpty) {
+    if (selectedNumbers != null) {
       setState(() {
+
+        _chapters[subject]!.removeWhere(
+          (chap) => !selectedNumbers.contains(int.parse(chap['number']!)),
+        );
+
         for (var number in selectedNumbers) {
           if (!_chapters[subject]!.any(
             (chap) => chap['number'] == number.toString(),
           )) {
-            _chapters[subject]!.add({'number': number.toString(), 'title': ''});
+
+            _chapters[subject]!.add({
+              'number': number.toString(),
+              'chapterName': '',
+            });
           }
         }
 
@@ -303,23 +318,32 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     }
   }
 
-  void _editChapterTitle(String subject, String chapterNumber) {
-    final titleController = TextEditingController(
+  void _editChapterName(String subject, String chapterNumber) {
+    final nameController = TextEditingController(
       text:
           _chapters[subject]?.firstWhere(
             (chap) => chap['number'] == chapterNumber,
-          )['title'],
+          )['chapterName'], 
     );
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Edit Title for Ch. $chapterNumber'),
+            title: Text(
+              'Edit Name for Ch. $chapterNumber',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
             content: TextField(
-              controller: titleController,
+              controller: nameController,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Chapter Title (Optional)',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Chapter Name (Optional)', 
+                labelStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             actions: [
@@ -334,8 +358,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                       (chap) => chap['number'] == chapterNumber,
                     );
                     if (chapterIndex != -1) {
-                      _chapters[subject]![chapterIndex]['title'] =
-                          titleController.text.trim();
+
+                      _chapters[subject]![chapterIndex]['chapterName'] =
+                          nameController.text.trim();
                     }
                   });
                   Navigator.pop(context);
@@ -347,51 +372,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     );
   }
 
-  List<int> _parseChapterNumbers(String input) {
-    final Set<int> numbers = {};
-    final parts = input
-        .split(',')
-        .map((p) => p.trim())
-        .where((p) => p.isNotEmpty);
-    for (final part in parts) {
-      if (part.contains('-')) {
-        final range = part.split('-');
-        if (range.length == 2) {
-          final start = int.tryParse(range[0]);
-          final end = int.tryParse(range[1]);
-          if (start != null && end != null && start <= end) {
-            for (int i = start; i <= end; i++) {
-              numbers.add(i);
-            }
-          }
-        }
-      } else {
-        final number = int.tryParse(part);
-        if (number != null) {
-          numbers.add(number);
-        }
-      }
-    }
-    return numbers.toList()..sort();
-  }
-
   Future<void> _generateTimetable() async {
     setState(() {
       _isGenerating = true;
     });
 
-    _generatedTimetable.clear();
-    final allChaptersForApi = <Map<String, String>>[];
-    _chapters.forEach((subject, chaps) {
-      for (var chap in chaps) {
-        allChaptersForApi.add({
-          'subject': subject,
-          'chapterNumber': chap['number']!,
-        });
-      }
-    });
-
-    if (allChaptersForApi.isEmpty || _deadline == null) {
+    if (_subjects.isEmpty || _deadline == null) {
       setState(() {
         _isGenerating = false;
       });
@@ -399,18 +385,17 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     }
 
     try {
-      final List<dynamic> apiResponse = await widget.apiService
-          .generateTimetable(chapters: allChaptersForApi, deadline: _deadline!);
+      final apiResponse = await widget.apiService.generateTimetablePreview(
+        chapters: _chapters,
+        deadline: _deadline!,
+      );
 
       final newTimetable =
           apiResponse.map((dayData) {
-            final date = DateTime.parse(dayData['date']);
+            final date = dayData['date'] as String;
             final tasks =
                 (dayData['tasks'] as List<dynamic>).map((taskData) {
-                  return {
-                    'type': taskData['type'],
-                    'content': taskData['content'],
-                  };
+                  return Map<String, dynamic>.from(taskData);
                 }).toList();
             return {'date': date, 'tasks': tasks};
           }).toList();
@@ -419,27 +404,59 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         _generatedTimetable = newTimetable;
       });
     } catch (e) {
-      print('Error generating study plan from API: $e');
+      print('Error generating study plan preview from API: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate study plan: $e')),
+          SnackBar(content: Text('Failed to generate study plan preview: $e')),
         );
       }
-      setState(() {
-        _generatedTimetable = [];
-      });
     } finally {
-      setState(() {
-        _isGenerating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveAndFinish() async {
+    setState(() {
+      _isSaving = true;
+    });
+    try {
+      final subjectsJson = _subjects.map((s) => s.toJson()).toList();
+      await widget.apiService.saveStudyPlan(
+        subjects: subjectsJson,
+        chapters: _chapters,
+        deadline: _deadline!,
+        timetable: _generatedTimetable,
+      );
+      await _loadTimetableData(); 
+    } catch (e) {
+      print('Error saving study plan: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save study plan: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
   bool _isNextEnabled() {
     if (_currentPage == 1 && _subjects.isEmpty) return false;
-    if (_currentPage == 2 &&
-        _chapters.values.fold<int>(0, (sum, item) => sum + item.length) < 2) {
-      return false;
+
+    if (_currentPage == 2) {
+      if (_subjects.isEmpty) return false;
+      return _subjects.every((subj) {
+        final chapList = _chapters[subj.name];
+        return chapList != null && chapList.length >= 2;
+      });
     }
     if (_currentPage == 3 && _deadline == null) return false;
     return true;
@@ -449,6 +466,18 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (_isSaving) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text("Saving your schedule..."),
+          ],
+        ),
+      );
     }
     return _isSetupComplete ? _buildTimetableView() : _buildOnboardingView();
   }
@@ -482,13 +511,15 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
   Widget _buildTimetableView() {
     final today = DateUtils.dateOnly(DateTime.now());
+    final todayString = DateFormat('yyyy-MM-dd').format(today);
+
     final todaySchedule = _generatedTimetable.firstWhere(
-      (d) => DateUtils.isSameDay(d['date'], today),
-      orElse: () => <String, Object>{'tasks': <dynamic>[]},
+      (d) => d['date'] == todayString,
+      orElse: () => <String, Object>{'date': todayString, 'tasks': <dynamic>[]},
     );
     final futureSchedule =
         _generatedTimetable
-            .where((d) => (d['date'] as DateTime).isAfter(today))
+            .where((d) => DateTime.parse(d['date']).isAfter(today))
             .toList();
 
     return Scaffold(
@@ -497,7 +528,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         children: [
           Text(
             "Today's Plan",
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           if ((todaySchedule['tasks'] as List).isEmpty)
@@ -507,10 +540,11 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             )
           else
             ...?(todaySchedule['tasks'] as List?)?.map(
-              (task) => _buildTaskTile(task),
+              (task) => _buildTaskTile(task, todaySchedule['date'] as String),
             ),
-          const SizedBox(height: 24),
           ExpansionTile(
+            shape: const Border(),
+            collapsedShape: const Border(),
             title: const Text("See ahead of time"),
             onExpansionChanged: (isExpanded) {
               setState(() => _showFullSchedule = isExpanded);
@@ -526,12 +560,18 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
                         child: Text(
-                          DateFormat('EEEE, MMM d').format(day['date']),
-                          style: Theme.of(context).textTheme.titleMedium,
+                          DateFormat(
+                            'EEEE, MMM d',
+                          ).format(DateTime.parse(day['date'])),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
                       ),
                       ...(day['tasks'] as List).map(
-                        (task) => _buildTaskTile(task),
+                        (task) => _buildTaskTile(task, day['date'] as String),
                       ),
                     ],
                   );
@@ -550,39 +590,91 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     );
   }
 
-  Widget _buildTaskTile(Map<String, dynamic> item) {
+  Future<void> _toggleTaskCompletion(
+    Map<String, dynamic> task,
+    String dateOfTask,
+  ) async {
+    if (task['completed'] == true) return; 
+
+    bool dialogWasShown = false;
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      dialogWasShown = true;
+    }
+
+    try {
+      final result = await widget.apiService.completeStudyPlanTask(
+        task['id'],
+        dateOfTask,
+      );
+
+      await _loadTimetableData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('You gained ${result['auraChange'] ?? 30} Aura!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update task: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (dialogWasShown && mounted) {
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  Widget _buildTaskTile(Map<String, dynamic> item, String dateOfTask) {
     IconData icon;
     Widget title;
     Widget? subtitle;
     Widget? trailing;
     Color avatarColor;
 
+    final today = DateUtils.dateOnly(DateTime.now());
+    final taskDate = DateUtils.dateOnly(DateTime.parse(dateOfTask));
+    final isFutureTask = taskDate.isAfter(today);
+
     switch (item['type']) {
       case 'study':
         final content = item['content'] as Map<String, dynamic>;
         final subject = _subjects.firstWhere(
           (s) => s.name == content['subject'],
-
           orElse:
               () => Subject(
                 name: 'Unknown',
                 icon: Icons.help,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.outline,
               ),
         );
 
         final chapterNumber = content['chapterNumber'] as String?;
 
-        final chapterTitle = content['title'] as String? ?? '';
+        final chapterName = content['chapterName'] as String? ?? '';
 
         icon = subject.icon;
         avatarColor = subject.color;
         title = Text(
-          chapterTitle.isNotEmpty ? chapterTitle : "Chapter $chapterNumber",
+
+          chapterName.isNotEmpty ? chapterName : "Chapter $chapterNumber",
           style: const TextStyle(fontWeight: FontWeight.w500),
         );
         subtitle = Text(subject.name);
-        if (chapterTitle.isNotEmpty) {
+        if (chapterName.isNotEmpty) {
           trailing = Text(
             "Ch. $chapterNumber",
             style: TextStyle(
@@ -595,21 +687,27 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         final content = item['content'] as Map<String, dynamic>;
         final subject = _subjects.firstWhere(
           (s) => s.name == content['subject'],
-
           orElse:
               () => Subject(
                 name: 'Unknown',
                 icon: Icons.help,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.outline,
               ),
         );
 
         final chapterNumber = content['chapterNumber'] as String?;
 
+        final chapterName = content['chapterName'] as String? ?? '';
+
         icon = Icons.history_outlined;
 
         avatarColor = subject.color.withOpacity(0.7);
-        title = Text("Revise: Chapter $chapterNumber");
+
+        title = Text(
+          chapterName.isNotEmpty
+              ? "Revise: $chapterName"
+              : "Revise: Chapter $chapterNumber",
+        );
         subtitle = Text(subject.name);
         break;
       default:
@@ -626,12 +724,33 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           backgroundColor: avatarColor,
           child: Icon(
             icon,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
+            color:
+                ThemeData.estimateBrightnessForColor(avatarColor) ==
+                        Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
           ),
         ),
         title: title,
         subtitle: subtitle,
-        trailing: trailing,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (trailing != null) trailing,
+            if (item['type'] != 'break')
+              Checkbox(
+                value: item['completed'] as bool,
+                onChanged:
+                    isFutureTask || (item['completed'] as bool)
+                        ? null
+                        : (bool? value) {
+                          if (value == true) {
+                            _toggleTaskCompletion(item, dateOfTask);
+                          }
+                        },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -654,13 +773,17 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           ),
           FilledButton(
             onPressed:
-                !_isNextEnabled()
+                !_isNextEnabled() || (_currentPage == 5 && _isGenerating)
                     ? null
                     : () {
                       if (_currentPage == 4) {
+
+                        _pageController.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.ease,
+                        );
                         _generateTimetable();
-                      }
-                      if (_currentPage == 5) {
+                      } else if (_currentPage == 5) {
                         _saveAndFinish();
                       } else {
                         _pageController.nextPage(
@@ -694,6 +817,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
@@ -721,6 +845,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -737,6 +862,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
               Expanded(
                 child: TextField(
                   controller: _subjectController,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Subject Name',
                     border: OutlineInputBorder(),
@@ -770,7 +898,10 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                     ),
                     title: Text(subject.name),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                       onPressed: () => _removeSubject(subject),
                     ),
                   ),
@@ -794,11 +925,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            "Select multiple chapter numbers at once, then tap a chapter to add an optional title.",
+            "Select multiple chapter numbers at once, then tap a chapter to add an optional name. Each subject must have at least 2 chapters.", 
             style: TextStyle(
               fontSize: 16,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -823,10 +955,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                         (chap) => ListTile(
                           title: Text("Ch. ${chap['number']}"),
                           subtitle:
-                              chap['title']!.isNotEmpty
-                                  ? Text(chap['title']!)
+                              chap['chapterName']!.isNotEmpty
+                                  ? Text(
+                                    chap['chapterName']!,
+                                  ) 
                                   : const Text(
-                                    'Tap to add title',
+                                    'Tap to add name', 
                                     style: TextStyle(
                                       fontStyle: FontStyle.italic,
                                       fontSize: 12,
@@ -834,7 +968,8 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                   ),
                           dense: true,
                           onTap:
-                              () => _editChapterTitle(
+                              () => _editChapterName(
+
                                 subject.name,
                                 chap['number']!,
                               ),
@@ -870,6 +1005,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -886,7 +1022,10 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             _deadline == null
                 ? 'No date selected'
                 : DateFormat.yMMMd().format(_deadline!),
-            style: const TextStyle(fontSize: 28),
+            style: TextStyle(
+              fontSize: 28,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -944,6 +1083,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             style: GoogleFonts.gabarito(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -967,7 +1107,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                       itemCount: _generatedTimetable.length,
                       itemBuilder: (context, index) {
                         final day = _generatedTimetable[index];
-                        final date = day['date'] as DateTime;
+                        final date = DateTime.parse(day['date'] as String);
                         final tasks = day['tasks'] as List;
 
                         return Card(
@@ -983,11 +1123,17 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                   ),
                                   child: Text(
                                     DateFormat('EEEE, MMM d').format(date),
-                                    style:
-                                        Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium?.copyWith(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                    ),
                                   ),
                                 ),
-                                const Divider(),
+
                                 ...tasks.map((task) {
                                   final content =
                                       task['content'] as Map<String, dynamic>;
@@ -1015,7 +1161,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                     title: Text(title),
                                     dense: true,
                                   );
-                                }).toList(),
+                                }),
                               ],
                             ),
                           ),
@@ -1100,7 +1246,9 @@ class SubjectIconPickerDialog extends StatelessWidget {
 }
 
 class ChapterPickerDialog extends StatefulWidget {
-  const ChapterPickerDialog({super.key});
+
+  final Set<int> initialChapters;
+  const ChapterPickerDialog({super.key, this.initialChapters = const {}});
 
   @override
   State<ChapterPickerDialog> createState() => _ChapterPickerDialogState();
@@ -1115,12 +1263,24 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
   final int _chaptersPerPage = 15;
 
   @override
+  void initState() {
+    super.initState();
+
+    _selectedChapters.addAll(widget.initialChapters);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Select Chapters'),
+      title: Text(
+        'Select Chapters',
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
       content: SizedBox(
         width: double.maxFinite,
-        height: 350,
+        height: 300, 
         child: Column(
           children: [
             Expanded(
@@ -1143,6 +1303,7 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                         chapterNumber,
                       );
                       return InkWell(
+                        borderRadius: BorderRadius.circular(50),
                         onTap: () {
                           setState(() {
                             if (isSelected) {
@@ -1152,7 +1313,6 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                             }
                           });
                         },
-
                         child: Container(
                           margin: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
@@ -1161,13 +1321,14 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                                     ? Theme.of(context).colorScheme.primary
                                     : Theme.of(
                                       context,
-                                    ).colorScheme.surfaceVariant,
+                                    ).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(50),
                           ),
                           child: Center(
                             child: Text(
                               '$chapterNumber',
                               style: TextStyle(
+
                                 color:
                                     isSelected
                                         ? Theme.of(
@@ -1175,7 +1336,7 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                                         ).colorScheme.onPrimary
                                         : Theme.of(
                                           context,
-                                        ).colorScheme.onSurfaceVariant,
+                                        ).colorScheme.onSurface,
                                 fontWeight: isSelected ? FontWeight.bold : null,
                               ),
                             ),
@@ -1200,7 +1361,12 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                             curve: Curves.easeIn,
                           ),
                 ),
-                Text('Page ${_currentPage + 1} of $_totalPages'),
+                Text(
+                  'Page ${_currentPage + 1} of $_totalPages',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.arrow_forward_ios),
                   onPressed:

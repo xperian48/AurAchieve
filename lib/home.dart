@@ -19,6 +19,7 @@ import 'widgets/dynamic_color_svg.dart';
 import 'screens/auth_check_screen.dart';
 import 'timer_page.dart';
 import 'study_planner.dart';
+import 'screens/extended_task_list.dart';
 
 enum AuraHistoryView { day, month, year }
 
@@ -137,7 +138,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _loadStudyPlanData() async {
+  Future<void> _loadStudyPlanData({int retryCount = 0}) async {
     final prefs = await SharedPreferences.getInstance();
     final isSetupComplete = prefs.getBool('studyPlannerSetupComplete') ?? false;
 
@@ -149,37 +150,70 @@ class _HomePageState extends State<HomePage> {
 
     if (!isSetupComplete) return;
 
-    final subjectsJson = prefs.getStringList('studyPlannerSubjects') ?? [];
-    final subjects =
-        subjectsJson.map((s) => Subject.fromJson(json.decode(s))).toList();
+    try {
+      final subjectsJson = prefs.getStringList('studyPlannerSubjects') ?? [];
+      final subjects =
+          subjectsJson.map((s) => Subject.fromJson(json.decode(s))).toList();
 
-    final timetableJson = prefs.getString('studyPlannerData');
-    if (timetableJson != null) {
-      final decoded = json.decode(timetableJson) as List;
-      final fullSchedule =
-          decoded
-              .map(
-                (e) => {
-                  'date': DateTime.parse(e['date']),
-                  'tasks':
-                      (e['tasks'] as List)
-                          .map((t) => Map<String, dynamic>.from(t))
-                          .toList(),
-                },
-              )
-              .toList();
+      final timetableJson = prefs.getString('studyPlannerData');
+      if (timetableJson != null) {
+        final decoded = json.decode(timetableJson) as List;
+        final fullSchedule =
+            decoded
+                .map(
+                  (e) => {
+                    'date': DateTime.parse(e['date']),
+                    'tasks':
+                        (e['tasks'] as List)
+                            .map((t) => Map<String, dynamic>.from(t))
+                            .toList(),
+                  },
+                )
+                .toList();
 
-      final today = DateUtils.dateOnly(DateTime.now());
-      final todaySchedule = fullSchedule.firstWhere(
-        (d) => DateUtils.isSameDay(d['date'] as DateTime, today),
-        orElse: () => {'tasks': []},
-      );
+        final today = DateUtils.dateOnly(DateTime.now());
+        final todaySchedule = fullSchedule.firstWhere(
+          (d) => DateUtils.isSameDay(d['date'] as DateTime, today),
+          orElse: () => {'tasks': []},
+        );
+
+        if (mounted) {
+          setState(() {
+            _subjects = subjects;
+            _todaysStudyPlan =
+                todaySchedule['tasks'] as List<Map<String, dynamic>>;
+          });
+        }
+      }
+    } on TypeError catch (e) {
+      if (e.toString().contains(
+        "type 'String' is not a subtype of type 'List<dynamic>'",
+      )) {
+        if (retryCount < 3) {
+          print(
+            "Study plan loading error. Retrying in 2 seconds... (Attempt ${retryCount + 1}/3)",
+          );
+          await Future.delayed(const Duration(seconds: 2));
+          return _loadStudyPlanData(retryCount: retryCount + 1);
+        } else {
+          print("Failed to load study plan after 3 attempts: $e");
+        }
+      } else {
+        print("Error loading study plan: $e");
+      }
 
       if (mounted) {
         setState(() {
-          _subjects = subjects;
-          _todaysStudyPlan =
-              todaySchedule['tasks'] as List<Map<String, dynamic>>;
+          _isStudyPlanSetupComplete = false;
+          _todaysStudyPlan = [];
+        });
+      }
+    } catch (e) {
+      print("Error loading study plan: $e");
+      if (mounted) {
+        setState(() {
+          _isStudyPlanSetupComplete = false;
+          _todaysStudyPlan = [];
         });
       }
     }
@@ -770,7 +804,7 @@ class _HomePageState extends State<HomePage> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
-          'AuraAscend',
+          'AurAchieve',
           style: GoogleFonts.gabarito(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -901,6 +935,8 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton:
           _selectedIndex == 0
               ? FloatingActionButton.extended(
+                heroTag:
+                    'add_task_fab', 
                 onPressed: _addTask,
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add Task'),
@@ -926,34 +962,88 @@ class _HomePageState extends State<HomePage> {
           _buildEmptyTasksView()
         else ...[
           const SizedBox(height: 8),
-          Text(
-            'Your Tasks',
-            style: GoogleFonts.gabarito(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Hero(
+                tag: 'your_tasks_title',
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Text(
+                    'Your Tasks',
+                    style: GoogleFonts.gabarito(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              if (pendingTasks.length > 4)
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) => AllTasksScreen(
+                          tasks: tasks,
+                          allPendingTasks: pendingTasks,
+                          onCompleteTask: _completeTask,
+                          onDeleteTask: _deleteTask,
+                          buildTaskIcon: _buildTaskIcon,
+                          buildTaskSubtitle: _buildTaskSubtitle,
+                          apiService: _apiService,
+                          onTaskCompleted: _fetchDataFromServer,
+                        ),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(1.0, 0.0);
+                          const end = Offset.zero;
+                          const curve = Curves.easeInOutCubic;
+
+                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                          var offsetAnimation = animation.drive(tween);
+
+                          return SlideTransition(
+                            position: offsetAnimation,
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+            ],
           ),
           const SizedBox(height: 8),
-          ...pendingTasks.take(_showAllTasks ? pendingTasks.length : 5).map((
-            task,
-          ) {
-            final originalTaskIndex = tasks.indexOf(task);
-            return _buildTaskListItem(task, originalTaskIndex);
-          }),
-          if (pendingTasks.length > 5)
-            TextButton(
-              onPressed: () => setState(() => _showAllTasks = !_showAllTasks),
-              child: Text(_showAllTasks ? 'Show Less' : 'Show More...'),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: pendingTasks.length > 4 ? 4 : pendingTasks.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.1,
             ),
+            itemBuilder: (context, index) {
+              final task = pendingTasks[index];
+              final originalTaskIndex = tasks.indexOf(task);
+              return _buildTaskCard(task, originalTaskIndex);
+            },
+          ),
         ],
 
         if (_isStudyPlanSetupComplete) ...[
-          const Divider(height: 32),
+          const SizedBox(height: 24.0), 
           Text(
-            "Today's Study Plan",
+            "Study Plan",
             style: GoogleFonts.gabarito(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -968,68 +1058,97 @@ class _HomePageState extends State<HomePage> {
                 .map((task) => _buildStudyPlanTile(task)),
             if (_todaysStudyPlan.length > 3)
               TextButton(
-                onPressed:
-                    () => setState(
-                      () => _showAllStudyTasks = !_showAllStudyTasks,
-                    ),
+                onPressed: () => setState(
+                  () => _showAllStudyTasks = !_showAllStudyTasks,
+                ),
                 child: Text(_showAllStudyTasks ? 'Show Less' : 'Show More...'),
               ),
           ],
-        ],
+        ]
       ],
     );
   }
 
-  Widget _buildTaskListItem(Task task, int originalTaskIndex) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: GestureDetector(
-        onLongPress: () => _deleteTask(originalTaskIndex),
-        child: Material(
-          elevation: 2,
-          borderRadius: BorderRadius.circular(18),
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          child: ListTile(
-            onTap: () {
-              if (task.taskCategory == "timed" &&
-                  task.type == "good" &&
-                  task.status == "pending") {
-                Navigator.push(
+  Widget _buildTaskCard(Task task, int originalTaskIndex) {
+    return Hero(
+      tag: 'task_hero_${task.id}',
+      child: Material(
+        type: MaterialType.transparency,
+        child: GestureDetector(
+          onTap: () {
+            if (task.taskCategory == "timed" &&
+                task.type == "good" &&
+                task.status == "pending") {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (_) => TimerPage(
+                        task: task,
+                        apiService: _apiService,
+                        onTaskCompleted: () {
+                          _fetchDataFromServer();
+                        },
+                      ),
+                ),
+              );
+            } else if (task.status == "pending") {
+              _completeTask(originalTaskIndex);
+            }
+          },
+          onLongPress: () => _deleteTask(originalTaskIndex),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Theme.of(
                   context,
-                  MaterialPageRoute(
-                    builder:
-                        (_) => TimerPage(
-                          task: task,
-                          apiService: _apiService,
-                          onTaskCompleted: () {
-                            _fetchDataFromServer();
-                          },
-                        ),
-                  ),
-                );
-              } else if (task.status == "pending") {
-                _completeTask(originalTaskIndex);
-              }
-            },
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            leading: _buildTaskIcon(task, context),
-            title: Text(
-              task.name,
-              style: GoogleFonts.gabarito(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
+                ).colorScheme.outlineVariant.withOpacity(0.3),
+                width: 1.5,
               ),
             ),
-            subtitle: _buildTaskSubtitle(task, context),
-            trailing: Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 18,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurfaceVariant.withOpacity(0.6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTaskIcon(task, context),
+                const SizedBox(height: 12),
+                Text(
+                  task.name,
+                  style: GoogleFonts.gabarito(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Text(
+                      _capitalize(task.type),
+                      style: GoogleFonts.gabarito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            task.type == 'bad'
+                                ? Theme.of(context).colorScheme.error
+                                : Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "(${_capitalize(task.intensity)})",
+                      style: GoogleFonts.gabarito(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
