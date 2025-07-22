@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl =
-      'https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net';
+      'https://redesigned-robot-j9p7vgg64gp2r75-4000.app.github.dev';
   final Account account;
   final _storage = const FlutterSecureStorage();
 
@@ -254,10 +254,24 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
+      // Handle cases where the server returns 200 but with an empty body
+      if (response.body.isEmpty ||
+          response.body == "null" ||
+          response.body == "{}") {
+        return null;
+      }
       return jsonDecode(response.body);
     } else if (response.statusCode == 404) {
+      // Handle explicit "Not Found"
       return null;
     } else {
+      // For other errors (like 500), check if the body implies "not found"
+      // before throwing an exception, making the client more resilient.
+      final body = response.body.toLowerCase();
+      if (body.contains('not found') || body.contains('no study plan')) {
+        return null;
+      }
+      // Otherwise, it's a real error we should report.
       throw Exception('Failed to get study plan: ${response.body}');
     }
   }

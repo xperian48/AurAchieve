@@ -304,136 +304,145 @@ class _HomePageState extends State<HomePage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter modalSetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 24,
-                right: 24,
-                top: 32,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Add New Task',
-                    style: GoogleFonts.gabarito(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Task Category:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('Normal Task'),
-                    value: 'normal',
-                    groupValue: selectedTaskCategory,
-                    onChanged:
-                        (value) =>
-                            modalSetState(() => selectedTaskCategory = value!),
-                    activeColor: Theme.of(context).colorScheme.primary,
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('Timed Task'),
-                    value: 'timed',
-                    groupValue: selectedTaskCategory,
-                    onChanged:
-                        (value) =>
-                            modalSetState(() => selectedTaskCategory = value!),
-                    activeColor: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: taskNameController,
-                    autofocus: true,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Enter task name',
-                      labelText: 'Task Name',
-                      labelStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+            // By wrapping the content in a SafeArea, we ensure it respects the
+            // system navigation bar, preventing the overlap.
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 32,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add New Task',
+                        style: GoogleFonts.gabarito(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                      hintStyle: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurfaceVariant.withOpacity(0.7),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  if (selectedTaskCategory == 'timed') ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: durationController,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Enter duration in minutes',
-                        labelText: 'Duration (minutes)',
-                        labelStyle: TextStyle(
+                      const SizedBox(height: 20),
+                      Text(
+                        'Task Category:',
+                        style: TextStyle(
+                          fontSize: 16,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        hintStyle: TextStyle(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                      RadioListTile<String>(
+                        title: const Text('Normal Task'),
+                        value: 'normal',
+                        groupValue: selectedTaskCategory,
+                        onChanged: (value) =>
+                            modalSetState(() => selectedTaskCategory = value!),
+                        activeColor: Theme.of(context).colorScheme.primary,
+                      ),
+                      RadioListTile<String>(
+                        title: const Text('Timed Task'),
+                        value: 'timed',
+                        groupValue: selectedTaskCategory,
+                        onChanged: (value) =>
+                            modalSetState(() => selectedTaskCategory = value!),
+                        activeColor: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: taskNameController,
+                        autofocus: true,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                        decoration: InputDecoration(
+                          hintText: 'Enter task name',
+                          labelText: 'Task Name',
+                          labelStyle: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          hintStyle: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
+                      if (selectedTaskCategory == 'timed') ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: durationController,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Enter duration in minutes',
+                            labelText: 'Duration (minutes)',
+                            labelStyle: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                            hintStyle: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () {
-                            final name = taskNameController.text.trim();
-                            if (name.isEmpty) return;
-                            Map<String, dynamic> data = {
-                              'name': name,
-                              'category': selectedTaskCategory,
-                            };
-                            if (selectedTaskCategory == 'timed') {
-                              final duration = int.tryParse(
-                                durationController.text.trim(),
-                              );
-                              if (duration == null || duration <= 0) {
-                                return;
-                              }
-                              data['duration'] = duration;
-                            }
-                            Navigator.pop(context, data);
-                          },
-                          child: const Text('Add Task'),
-                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () {
+                                final name = taskNameController.text.trim();
+                                if (name.isEmpty) return;
+                                Map<String, dynamic> data = {
+                                  'name': name,
+                                  'category': selectedTaskCategory,
+                                };
+                                if (selectedTaskCategory == 'timed') {
+                                  final duration = int.tryParse(
+                                    durationController.text.trim(),
+                                  );
+                                  if (duration == null || duration <= 0) {
+                                    return;
+                                  }
+                                  data['duration'] = duration;
+                                }
+                                Navigator.pop(context, data);
+                              },
+                              child: const Text('Add Task'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -953,119 +962,131 @@ class _HomePageState extends State<HomePage> {
   Widget _buildDashboardView() {
     final pendingTasks = tasks.where((t) => t.status == 'pending').toList();
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 18.0,
-      ).copyWith(bottom: 80),
-      children: [
-        if (pendingTasks.isEmpty)
-          _buildEmptyTasksView()
-        else ...[
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Hero(
-                tag: 'your_tasks_title',
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: Text(
-                    'Your Tasks',
-                    style: GoogleFonts.gabarito(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Determine the number of columns based on screen width
+        final double screenWidth = constraints.maxWidth;
+        final int crossAxisCount = screenWidth > 600 ? 4 : 2;
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18.0,
+          ).copyWith(bottom: 80),
+          children: [
+            if (pendingTasks.isEmpty)
+              _buildEmptyTasksView()
+            else ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Hero(
+                    tag: 'your_tasks_title',
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Text(
+                        'Your Tasks',
+                        style: GoogleFonts.gabarito(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              if (pendingTasks.length > 4)
-                IconButton(
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) => AllTasksScreen(
-                          tasks: tasks,
-                          allPendingTasks: pendingTasks,
-                          onCompleteTask: _completeTask,
-                          onDeleteTask: _deleteTask,
-                          buildTaskIcon: _buildTaskIcon,
-                          buildTaskSubtitle: _buildTaskSubtitle,
-                          apiService: _apiService,
-                          onTaskCompleted: _fetchDataFromServer,
-                        ),
-                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                          const begin = Offset(1.0, 0.0);
-                          const end = Offset.zero;
-                          const curve = Curves.easeInOutCubic;
-
-                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                          var offsetAnimation = animation.drive(tween);
-
-                          return SlideTransition(
-                            position: offsetAnimation,
-                            child: FadeTransition(
-                              opacity: animation,
-                              child: child,
+                  if (pendingTasks.length > 4)
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          PageRouteBuilder(
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    AllTasksScreen(
+                              tasks: tasks,
+                              allPendingTasks: pendingTasks,
+                              onCompleteTask: _completeTask,
+                              onDeleteTask: _deleteTask,
+                              buildTaskIcon: _buildTaskIcon,
+                              buildTaskSubtitle: _buildTaskSubtitle,
+                              apiService: _apiService,
+                              onTaskCompleted: _fetchDataFromServer,
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: pendingTasks.length > 4 ? 4 : pendingTasks.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.1,
-            ),
-            itemBuilder: (context, index) {
-              final task = pendingTasks[index];
-              final originalTaskIndex = tasks.indexOf(task);
-              return _buildTaskCard(task, originalTaskIndex);
-            },
-          ),
-        ],
+                            transitionsBuilder: (context, animation,
+                                secondaryAnimation, child) {
+                              const begin = Offset(1.0, 0.0);
+                              const end = Offset.zero;
+                              const curve = Curves.easeInOutCubic;
 
-        if (_isStudyPlanSetupComplete) ...[
-          const SizedBox(height: 24.0), 
-          Text(
-            "Study Plan",
-            style: GoogleFonts.gabarito(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (_todaysStudyPlan.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0),
-              child: Text("Nothing scheduled for today. Enjoy your break!"),
-            )
-          else ...[
-            ..._todaysStudyPlan
-                .take(_showAllStudyTasks ? _todaysStudyPlan.length : 3)
-                .map((task) => _buildStudyPlanTile(task)),
-            if (_todaysStudyPlan.length > 3)
-              TextButton(
-                onPressed: () => setState(
-                  () => _showAllStudyTasks = !_showAllStudyTasks,
-                ),
-                child: Text(_showAllStudyTasks ? 'Show Less' : 'Show More...'),
+                              var tween = Tween(begin: begin, end: end)
+                                  .chain(CurveTween(curve: curve));
+                              var offsetAnimation = animation.drive(tween);
+
+                              return SlideTransition(
+                                position: offsetAnimation,
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                ],
               ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: pendingTasks.length > 4 ? 4 : pendingTasks.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.1,
+                ),
+                itemBuilder: (context, index) {
+                  final task = pendingTasks[index];
+                  final originalTaskIndex = tasks.indexOf(task);
+                  return _buildTaskCard(task, originalTaskIndex);
+                },
+              ),
+            ],
+            if (_isStudyPlanSetupComplete) ...[
+              const SizedBox(height: 24.0),
+              Text(
+                "Study Plan",
+                style: GoogleFonts.gabarito(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_todaysStudyPlan.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: Text("Nothing scheduled for today. Enjoy your break!"),
+                )
+              else ...[
+                ..._todaysStudyPlan
+                    .take(_showAllStudyTasks ? _todaysStudyPlan.length : 3)
+                    .map((task) => _buildStudyPlanTile(task)),
+                if (_todaysStudyPlan.length > 3)
+                  TextButton(
+                    onPressed: () => setState(
+                      () => _showAllStudyTasks = !_showAllStudyTasks,
+                    ),
+                    child:
+                        Text(_showAllStudyTasks ? 'Show Less' : 'Show More...'),
+                  ),
+              ],
+            ]
           ],
-        ]
-      ],
+        );
+      },
     );
   }
 

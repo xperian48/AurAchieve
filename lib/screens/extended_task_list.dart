@@ -187,18 +187,20 @@ class _AllTasksScreenState extends State<AllTasksScreen>
 
       body: LayoutBuilder(
         builder: (context, constraints) {
+          // Determine the number of columns based on screen width
+          final double screenWidth = constraints.maxWidth;
+          final int crossAxisCount = screenWidth > 600 ? 4 : 2;
 
           return Stack(
             children: [
-
               GridView.builder(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18.0,
                   vertical: 8.0,
                 ),
                 itemCount: _localPendingTasks.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   childAspectRatio: 1.1,
@@ -247,7 +249,11 @@ class _AllTasksScreenState extends State<AllTasksScreen>
                 ),
 
               if (expandedTaskId != null)
-                _buildExpandedOverlayFromConstraints(context, constraints),
+                _buildExpandedOverlayFromConstraints(
+                  context,
+                  constraints,
+                  crossAxisCount,
+                ),
             ],
           );
         },
@@ -258,6 +264,7 @@ class _AllTasksScreenState extends State<AllTasksScreen>
   Widget _buildExpandedOverlayFromConstraints(
     BuildContext context,
     BoxConstraints constraints,
+    int crossAxisCount,
   ) {
     final expandedIndex = _localPendingTasks.indexWhere(
       (t) => t.id == expandedTaskId,
@@ -268,14 +275,18 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     final originalIndex = widget.tasks.indexOf(task);
     final isCompleting = _completingTasks[task.id] == true;
 
-    final itemsPerRow = 2;
+    final itemsPerRow = crossAxisCount;
     final row = expandedIndex ~/ itemsPerRow;
     final column = expandedIndex % itemsPerRow;
 
     final screenWidth = constraints.maxWidth;
-    final screenHeight =
-        constraints.maxHeight; 
-    final itemWidth = (screenWidth - 48) / 2;
+    final screenHeight = constraints.maxHeight;
+
+    // Dynamically calculate item width based on the number of columns
+    final double totalHorizontalPadding = 36.0; // 18 on each side
+    final double totalSpacing = (crossAxisCount - 1) * 12.0;
+    final itemWidth =
+        (screenWidth - totalHorizontalPadding - totalSpacing) / crossAxisCount;
     final itemHeight = itemWidth / 1.1;
 
     final leftPos = 18.0 + (column * (itemWidth + 12));

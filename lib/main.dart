@@ -238,6 +238,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   String error = '';
   bool stopCarousel = false;
   final _storage = const FlutterSecureStorage();
+  bool _isPasswordVisible = false;
 
   @override
   void initState() {
@@ -528,12 +529,24 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 prefixIcon: Icon(Icons.lock_rounded),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isPasswordVisible
+                        ? Icons.visibility_rounded        // Show "eye" when visible
+                        : Icons.visibility_off_rounded,   // Show "eye-off" when hidden
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    });
+                  },
+                ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 18,
                 ),
               ),
-              obscureText: true,
+              obscureText: !_isPasswordVisible,
               autofillHints: [AutofillHints.newPassword],
               textInputAction: TextInputAction.done,
             ),
@@ -605,8 +618,20 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 prefixIcon: Icon(Icons.lock_rounded),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isPasswordVisible
+                        ? Icons.visibility_rounded        // Show "eye" when visible
+                        : Icons.visibility_off_rounded,   // Show "eye-off" when hidden
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    });
+                  },
+                ),
               ),
-              obscureText: true,
+              obscureText: !_isPasswordVisible,
               autofillHints: [AutofillHints.password],
             ),
             SizedBox(height: 24),
