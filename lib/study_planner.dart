@@ -37,11 +37,13 @@ class Subject {
 class StudyPlannerScreen extends StatefulWidget {
   final Function(bool) onSetupStateChanged;
   final ApiService apiService;
+  final VoidCallback? onTaskCompleted;
 
   const StudyPlannerScreen({
     super.key,
     required this.onSetupStateChanged,
     required this.apiService,
+    this.onTaskCompleted,
   });
 
   @override
@@ -276,7 +278,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   }
 
   void _showChapterPicker(String subject) async {
-
     final existingChapterNumbers =
         _chapters[subject]
             ?.map((chap) => int.tryParse(chap['number']!))
@@ -294,7 +295,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
     if (selectedNumbers != null) {
       setState(() {
-
         _chapters[subject]!.removeWhere(
           (chap) => !selectedNumbers.contains(int.parse(chap['number']!)),
         );
@@ -303,7 +303,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           if (!_chapters[subject]!.any(
             (chap) => chap['number'] == number.toString(),
           )) {
-
             _chapters[subject]!.add({
               'number': number.toString(),
               'chapterName': '',
@@ -323,7 +322,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
       text:
           _chapters[subject]?.firstWhere(
             (chap) => chap['number'] == chapterNumber,
-          )['chapterName'], 
+          )['chapterName'],
     );
     showDialog(
       context: context,
@@ -340,7 +339,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
               autofocus: true,
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: InputDecoration(
-                labelText: 'Chapter Name (Optional)', 
+                labelText: 'Chapter Name (Optional)',
                 labelStyle: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -358,7 +357,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                       (chap) => chap['number'] == chapterNumber,
                     );
                     if (chapterIndex != -1) {
-
                       _chapters[subject]![chapterIndex]['chapterName'] =
                           nameController.text.trim();
                     }
@@ -431,7 +429,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         deadline: _deadline!,
         timetable: _generatedTimetable,
       );
-      await _loadTimetableData(); 
+      await _loadTimetableData();
     } catch (e) {
       print('Error saving study plan: $e');
       if (mounted) {
@@ -533,11 +531,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          // If today has no tasks, show a break day tile.
           if ((todaySchedule['tasks'] as List).isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0),
-              child: Text("Nothing scheduled for today. Take a break!"),
-            )
+            _buildTaskTile({'type': 'break'}, todaySchedule['date'] as String)
           else
             ...?(todaySchedule['tasks'] as List?)?.map(
               (task) => _buildTaskTile(task, todaySchedule['date'] as String),
@@ -570,9 +566,13 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                           ),
                         ),
                       ),
-                      ...(day['tasks'] as List).map(
-                        (task) => _buildTaskTile(task, day['date'] as String),
-                      ),
+                      // If a future day has no tasks, show a break day tile.
+                      if ((day['tasks'] as List).isEmpty)
+                        _buildTaskTile({'type': 'break'}, day['date'] as String)
+                      else
+                        ...(day['tasks'] as List).map(
+                          (task) => _buildTaskTile(task, day['date'] as String),
+                        ),
                     ],
                   );
                 }),
@@ -594,7 +594,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     Map<String, dynamic> task,
     String dateOfTask,
   ) async {
-    if (task['completed'] == true) return; 
+    if (task['completed'] == true) return;
 
     bool dialogWasShown = false;
     if (mounted) {
@@ -613,6 +613,10 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
       );
 
       await _loadTimetableData();
+
+      if (widget.onTaskCompleted != null) {
+        widget.onTaskCompleted!();
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -638,7 +642,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     }
   }
 
-  Widget _buildTaskTile(Map<String, dynamic> item, String dateOfTask) {
+  Widget _buildTaskTile(
+    Map<String, dynamic> item,
+    String dateOfTask, {
+    bool isFeedback = false,
+    bool isPreview = false, // Add this flag to control preview appearance
+  }) {
     IconData icon;
     Widget title;
     Widget? subtitle;
@@ -669,7 +678,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         icon = subject.icon;
         avatarColor = subject.color;
         title = Text(
-
           chapterName.isNotEmpty ? chapterName : "Chapter $chapterNumber",
           style: const TextStyle(fontWeight: FontWeight.w500),
         );
@@ -737,11 +745,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (trailing != null) trailing,
-            if (item['type'] != 'break')
+            // Hide checkbox if it's a break, feedback, or in preview mode
+            if (item['type'] != 'break' && !isFeedback && !isPreview)
               Checkbox(
-                value: item['completed'] as bool,
+                value: (item['completed'] as bool?) ?? false,
                 onChanged:
-                    isFutureTask || (item['completed'] as bool)
+                    isFutureTask || ((item['completed'] as bool?) ?? false)
                         ? null
                         : (bool? value) {
                           if (value == true) {
@@ -776,8 +785,11 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                 !_isNextEnabled() || (_currentPage == 5 && _isGenerating)
                     ? null
                     : () {
+                      // When leaving the subjects page, unfocus the text field
+                      if (_currentPage == 1) {
+                        FocusScope.of(context).unfocus();
+                      }
                       if (_currentPage == 4) {
-
                         _pageController.nextPage(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.ease,
@@ -930,7 +942,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            "Select multiple chapter numbers at once, then tap a chapter to add an optional name. Each subject must have at least 2 chapters.", 
+            "Select multiple chapter numbers at once, then tap a chapter to add an optional name. Each subject must have at least 2 chapters.",
             style: TextStyle(
               fontSize: 16,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -956,11 +968,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                           title: Text("Ch. ${chap['number']}"),
                           subtitle:
                               chap['chapterName']!.isNotEmpty
-                                  ? Text(
-                                    chap['chapterName']!,
-                                  ) 
+                                  ? Text(chap['chapterName']!)
                                   : const Text(
-                                    'Tap to add name', 
+                                    'Tap to add name',
                                     style: TextStyle(
                                       fontStyle: FontStyle.italic,
                                       fontSize: 12,
@@ -969,7 +979,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                           dense: true,
                           onTap:
                               () => _editChapterName(
-
                                 subject.name,
                                 chap['number']!,
                               ),
@@ -1088,7 +1097,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            "This is a preview of the generated schedule. You can go back to make changes.",
+            "This is a preview of the generated schedule. You can go back to make changes or drag and drop these across days.",
             style: TextStyle(
               fontSize: 16,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1110,61 +1119,129 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                         final date = DateTime.parse(day['date'] as String);
                         final tasks = day['tasks'] as List;
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                  ),
-                                  child: Text(
-                                    DateFormat('EEEE, MMM d').format(date),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                    ),
-                                  ),
+                        // Each day is a target to accept dragged tasks
+                        return DragTarget<Map<String, dynamic>>(
+                          builder: (context, candidateData, rejectedData) {
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8.0,
                                 ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16.0,
+                                      ),
+                                      child: Text(
+                                        DateFormat('EEEE, MMM d').format(date),
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium?.copyWith(
+                                          color:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    // If a day has no tasks, show a break day tile
+                                    if (tasks.isEmpty)
+                                      _buildTaskTile(
+                                        {'type': 'break'},
+                                        day['date'] as String,
+                                        isPreview: true,
+                                      )
+                                    else
+                                      ...tasks.map((task) {
+                                        // Each task is a draggable item
+                                        return Draggable<Map<String, dynamic>>(
+                                          // Data to identify the task and its origin
+                                          data: {
+                                            'task': task,
+                                            'sourceDate': day['date'],
+                                          },
+                                          // How the task looks while being dragged
+                                          feedback: Material(
+                                            elevation: 4.0,
+                                            child: ConstrainedBox(
+                                              constraints: BoxConstraints(
+                                                maxWidth:
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).size.width *
+                                                    0.8,
+                                              ),
+                                              child: _buildTaskTile(
+                                                task,
+                                                day['date'],
+                                                isFeedback: true,
+                                                isPreview: true,
+                                              ),
+                                            ),
+                                          ),
+                                          // How the original space looks
+                                          childWhenDragging: Opacity(
+                                            opacity: 0.5,
+                                            child: _buildTaskTile(
+                                              task,
+                                              day['date'],
+                                              isPreview: true,
+                                            ),
+                                          ),
+                                          // The task tile itself
+                                          child: _buildTaskTile(
+                                            task,
+                                            day['date'],
+                                            isPreview: true,
+                                          ),
+                                        );
+                                      }),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          // Logic to handle the drop
+                          onAccept: (data) {
+                            final taskToMove = data['task'] as Map<String, dynamic>;
+                            final sourceDateStr = data['sourceDate'] as String;
+                            final targetDateStr = day['date'] as String;
 
-                                ...tasks.map((task) {
-                                  final content =
-                                      task['content'] as Map<String, dynamic>;
-                                  String title;
-                                  IconData icon;
+                            // Prevent dropping a task back onto its own day
+                            if (sourceDateStr == targetDateStr) return;
 
-                                  switch (task['type']) {
-                                    case 'study':
-                                      title =
-                                          "Study ${content['subject']} - Ch. ${content['chapterNumber']}";
-                                      icon = Icons.book_outlined;
-                                      break;
-                                    case 'revision':
-                                      title =
-                                          "Revise ${content['subject']} - Ch. ${content['chapterNumber']}";
-                                      icon = Icons.history_edu_outlined;
-                                      break;
-                                    default:
-                                      title = "Break Day";
-                                      icon = Icons.self_improvement_outlined;
-                                  }
+                            setState(() {
+                              // Find the indices for source and target days
+                              final sourceIndex = _generatedTimetable.indexWhere(
+                                (d) => d['date'] == sourceDateStr,
+                              );
+                              final targetIndex = _generatedTimetable.indexWhere(
+                                (d) => d['date'] == targetDateStr,
+                              );
 
-                                  return ListTile(
-                                    leading: Icon(icon),
-                                    title: Text(title),
-                                    dense: true,
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
+                              if (sourceIndex == -1 || targetIndex == -1) return;
+
+                              // Create new lists to avoid in-place mutation bugs
+                              final sourceTasks = List<Map<String, dynamic>>.from(
+                                _generatedTimetable[sourceIndex]['tasks'] as List,
+                              );
+                              final targetTasks = List<Map<String, dynamic>>.from(
+                                _generatedTimetable[targetIndex]['tasks'] as List,
+                              );
+
+                              // Remove the task from the source day
+                              sourceTasks.removeWhere((t) => t['id'] == taskToMove['id']);
+                              // Add the task to the target day
+                              targetTasks.add(taskToMove);
+
+                              // Assign the new lists back to the timetable
+                              _generatedTimetable[sourceIndex]['tasks'] = sourceTasks;
+                              _generatedTimetable[targetIndex]['tasks'] = targetTasks;
+                            });
+                          },
                         );
                       },
                     ),
@@ -1246,7 +1323,6 @@ class SubjectIconPickerDialog extends StatelessWidget {
 }
 
 class ChapterPickerDialog extends StatefulWidget {
-
   final Set<int> initialChapters;
   const ChapterPickerDialog({super.key, this.initialChapters = const {}});
 
@@ -1280,7 +1356,7 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
       ),
       content: SizedBox(
         width: double.maxFinite,
-        height: 300, 
+        height: 300,
         child: Column(
           children: [
             Expanded(
@@ -1328,7 +1404,6 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                             child: Text(
                               '$chapterNumber',
                               style: TextStyle(
-
                                 color:
                                     isSelected
                                         ? Theme.of(

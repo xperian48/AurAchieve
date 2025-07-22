@@ -24,7 +24,7 @@ class OnBoard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  'Welcome to AuraAscend',
+                  'Welcome to AurAchieve',
                   style: GoogleFonts.ebGaramond(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,

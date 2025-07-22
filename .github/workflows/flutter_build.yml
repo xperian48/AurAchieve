@@ -74,7 +74,7 @@ jobs:
         # Define paths for clarity
         APP_BUNDLE_SOURCE="build/ios/iphoneos/Runner.app"
         PAYLOAD_DIR="Payload"
-        OUTPUT_IPA_NAME="AuraAscend.ipa"
+        OUTPUT_IPA_NAME="AurAchieve.ipa"
 
         # Create the Payload directory. It will be created at the repository root.
         mkdir -p "$PAYLOAD_DIR"
@@ -111,4 +111,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: unsigned-ios-ipa
-        path: AuraAscend.ipa # This path points to the IPA created in the previous step
+        path: AurAchieve.ipa # This path points to the IPA created in the previous step

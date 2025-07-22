@@ -1,4 +1,4 @@
-import 'dart:async'; 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../home.dart';
@@ -57,7 +57,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
           ..addListener(() {
             setState(() {});
           })
-
           ..addStatusListener((status) {
             if (status == AnimationStatus.completed) {
               setState(() => _showCompleteLabel = true);
@@ -69,7 +68,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
               _labelTimer?.cancel();
               setState(() {
                 _showCompleteLabel = false;
-
               });
 
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -89,7 +87,7 @@ class _AllTasksScreenState extends State<AllTasksScreen>
   @override
   void dispose() {
     _expandController.dispose();
-    _labelTimer?.cancel(); 
+    _labelTimer?.cancel();
 
     for (final controller in _checkAnimControllers.values) {
       controller.dispose();
@@ -99,16 +97,13 @@ class _AllTasksScreenState extends State<AllTasksScreen>
   }
 
   void _toggleExpand(String taskId) {
-
     if (_expandController.isAnimating) return;
 
     if (expandedTaskId == taskId) {
-
       _labelTimer?.cancel();
       setState(() => _showCompleteLabel = false);
       _expandController.reverse();
     } else {
-
       setState(() {
         expandedTaskId = taskId;
       });
@@ -130,7 +125,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     await _checkAnimControllers[task.id]!.forward(from: 0.0);
 
     try {
-
       await widget.onCompleteTask(originalIndex);
 
       await Future.delayed(const Duration(milliseconds: 300));
@@ -141,13 +135,11 @@ class _AllTasksScreenState extends State<AllTasksScreen>
           _completingTasks[task.id] = false;
 
           if (expandedTaskId == task.id) {
-
             _toggleExpand(task.id);
           }
         });
       }
     } catch (e) {
-
       if (mounted) {
         setState(() {
           _completingTasks[task.id] = false;
@@ -172,7 +164,7 @@ class _AllTasksScreenState extends State<AllTasksScreen>
           child: Material(
             type: MaterialType.transparency,
             child: Text(
-              'All Tasks',
+              'Your Tasks',
               style: GoogleFonts.gabarito(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
@@ -187,7 +179,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
 
       body: LayoutBuilder(
         builder: (context, constraints) {
-          // Determine the number of columns based on screen width
           final double screenWidth = constraints.maxWidth;
           final int crossAxisCount = screenWidth > 600 ? 4 : 2;
 
@@ -282,8 +273,7 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     final screenWidth = constraints.maxWidth;
     final screenHeight = constraints.maxHeight;
 
-    // Dynamically calculate item width based on the number of columns
-    final double totalHorizontalPadding = 36.0; // 18 on each side
+    final double totalHorizontalPadding = 36.0;
     final double totalSpacing = (crossAxisCount - 1) * 12.0;
     final itemWidth =
         (screenWidth - totalHorizontalPadding - totalSpacing) / crossAxisCount;
@@ -344,10 +334,8 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     final theme = Theme.of(context);
 
     return GestureDetector(
-
       onTap: () {},
       child: Transform(
-
         transform:
             Matrix4.identity()..scale(1.0 + _expandAnimation.value * 0.05),
         alignment: Alignment.center,
@@ -362,7 +350,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
               color: theme.colorScheme.primary.withOpacity(0.6),
               width: 2.0,
             ),
-
           ),
 
           child: ClipRRect(
@@ -370,11 +357,9 @@ class _AllTasksScreenState extends State<AllTasksScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-
                     GestureDetector(
                       onTap:
                           isCompleting
@@ -382,7 +367,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
                               : () => _completeTask(task, originalIndex),
                       child: Row(
                         children: [
-
                           Container(
                             width: 40,
                             height: 40,
@@ -400,7 +384,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-
                                 Transform.scale(
                                   scale: 1.0 - _expandAnimation.value,
                                   child: Opacity(
@@ -442,9 +425,7 @@ class _AllTasksScreenState extends State<AllTasksScreen>
 
                           AnimatedOpacity(
                             opacity: _showCompleteLabel ? 1.0 : 0.0,
-                            duration: const Duration(
-                              milliseconds: 250, 
-                            ),
+                            duration: const Duration(milliseconds: 250),
                             curve: Curves.easeOut,
                             child: Text(
                               'Mark as complete',
@@ -478,7 +459,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
 
                 Expanded(
                   child: AnimatedOpacity(
-
                     opacity: _expandAnimation.value,
 
                     duration: const Duration(milliseconds: 100),
@@ -662,9 +642,65 @@ class _AllTasksScreenState extends State<AllTasksScreen>
               color: theme.colorScheme.onTertiaryContainer,
             ),
           ),
-          onPressed: () {
-            widget.onDeleteTask(originalIndex);
-            _toggleExpand(task.id);
+          onPressed: () async {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final textColor = isDark ? Colors.white : Colors.black87;
+            final bgColor = Theme.of(context).colorScheme.surface;
+
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    backgroundColor: bgColor,
+                    title: Text(
+                      "Mark Task as Bad",
+                      style: TextStyle(color: textColor),
+                    ),
+                    content: Text(
+                      "If this is a bad task, you can mark it as one and lose aura whenever you do it.",
+                      style: TextStyle(color: textColor),
+                    ),
+                    actions: [
+                      TextButton(
+                        child: const Text("Cancel"),
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: TextButton.styleFrom(
+                          foregroundColor:
+                              Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      FilledButton(
+                        child: const Text("Mark as Bad"),
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onError,
+                        ),
+                      ),
+                    ],
+                  ),
+            );
+            if (confirm == true) {
+              try {
+                await widget.apiService.markTaskAsBad(task.id);
+                widget.onTaskCompleted();
+                _toggleExpand(task.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Task marked as bad.'),
+                    backgroundColor: theme.colorScheme.error,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to mark as bad: $e'),
+                    backgroundColor: theme.colorScheme.error,
+                  ),
+                );
+              }
+            }
           },
         ),
       ],
@@ -680,7 +716,6 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     BoxConstraints constraints,
     int index,
   ) {
-
     const int maxTitleChars = 30;
     final String displayTitle =
         task.name.length > maxTitleChars && !isExpanded
@@ -704,10 +739,8 @@ class _AllTasksScreenState extends State<AllTasksScreen>
             ),
           );
         } else if (isExpanded) {
-
           _toggleExpand(task.id);
         } else {
-
           _toggleExpand(task.id);
         }
       },

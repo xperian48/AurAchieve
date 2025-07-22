@@ -378,7 +378,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
     final features = [
       {
         'svg': 'assets/img/welcome.svg',
-        'title': 'Welcome to AuraAscend',
+        'title': 'Welcome to AurAchieve',
         'desc': 'Prepare to live a better life.',
       },
       {
@@ -532,8 +532,10 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                 suffixIcon: IconButton(
                   icon: Icon(
                     _isPasswordVisible
-                        ? Icons.visibility_rounded        // Show "eye" when visible
-                        : Icons.visibility_off_rounded,   // Show "eye-off" when hidden
+                        ? Icons
+                            .visibility_rounded // Show "eye" when visible
+                        : Icons
+                            .visibility_off_rounded, // Show "eye-off" when hidden
                   ),
                   onPressed: () {
                     setState(() {
@@ -621,8 +623,10 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                 suffixIcon: IconButton(
                   icon: Icon(
                     _isPasswordVisible
-                        ? Icons.visibility_rounded        // Show "eye" when visible
-                        : Icons.visibility_off_rounded,   // Show "eye-off" when hidden
+                        ? Icons
+                            .visibility_rounded // Show "eye" when visible
+                        : Icons
+                            .visibility_off_rounded, // Show "eye-off" when hidden
                   ),
                   onPressed: () {
                     setState(() {

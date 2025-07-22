@@ -150,7 +150,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
     final features = [
       {
         'svg': 'assets/img/welcome.svg',
-        'title': 'Welcome to AuraAscend',
+        'title': 'Welcome to AurAchieve',
         'desc': 'Prepare to live a better life.',
       },
       {

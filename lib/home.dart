@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 import 'social_blocker.dart';
 import 'stats.dart';
@@ -138,78 +139,42 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _loadStudyPlanData({int retryCount = 0}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final isSetupComplete = prefs.getBool('studyPlannerSetupComplete') ?? false;
-
-    if (mounted) {
-      setState(() {
-        _isStudyPlanSetupComplete = isSetupComplete;
-      });
-    }
-
-    if (!isSetupComplete) return;
-
+  Future<void> _loadStudyPlanData() async {
     try {
-      final subjectsJson = prefs.getStringList('studyPlannerSubjects') ?? [];
-      final subjects =
-          subjectsJson.map((s) => Subject.fromJson(json.decode(s))).toList();
+      final plan = await _apiService.getStudyPlan();
+      if (mounted) {
+        if (plan != null) {
+          final subjectsJson = plan['subjects'] as List? ?? [];
+          final subjects = subjectsJson
+              .map((s) => Subject.fromJson(s as Map<String, dynamic>))
+              .toList();
 
-      final timetableJson = prefs.getString('studyPlannerData');
-      if (timetableJson != null) {
-        final decoded = json.decode(timetableJson) as List;
-        final fullSchedule =
-            decoded
-                .map(
-                  (e) => {
-                    'date': DateTime.parse(e['date']),
-                    'tasks':
-                        (e['tasks'] as List)
-                            .map((t) => Map<String, dynamic>.from(t))
-                            .toList(),
-                  },
-                )
-                .toList();
+          final timetableJson = plan['timetable'] as List? ?? [];
+          final today = DateUtils.dateOnly(DateTime.now());
+          final todayString = DateFormat('yyyy-MM-dd').format(today);
 
-        final today = DateUtils.dateOnly(DateTime.now());
-        final todaySchedule = fullSchedule.firstWhere(
-          (d) => DateUtils.isSameDay(d['date'] as DateTime, today),
-          orElse: () => {'tasks': []},
-        );
+          final todaySchedule = timetableJson.firstWhere(
+            (d) => d['date'] == todayString,
+            orElse: () => {'tasks': []},
+          );
 
-        if (mounted) {
           setState(() {
+            _isStudyPlanSetupComplete = true;
             _subjects = subjects;
             _todaysStudyPlan =
-                todaySchedule['tasks'] as List<Map<String, dynamic>>;
+                (todaySchedule['tasks'] as List? ?? [])
+                    .map((t) => Map<String, dynamic>.from(t))
+                    .toList();
+          });
+        } else {
+          setState(() {
+            _isStudyPlanSetupComplete = false;
+            _todaysStudyPlan = [];
           });
         }
       }
-    } on TypeError catch (e) {
-      if (e.toString().contains(
-        "type 'String' is not a subtype of type 'List<dynamic>'",
-      )) {
-        if (retryCount < 3) {
-          print(
-            "Study plan loading error. Retrying in 2 seconds... (Attempt ${retryCount + 1}/3)",
-          );
-          await Future.delayed(const Duration(seconds: 2));
-          return _loadStudyPlanData(retryCount: retryCount + 1);
-        } else {
-          print("Failed to load study plan after 3 attempts: $e");
-        }
-      } else {
-        print("Error loading study plan: $e");
-      }
-
-      if (mounted) {
-        setState(() {
-          _isStudyPlanSetupComplete = false;
-          _todaysStudyPlan = [];
-        });
-      }
     } catch (e) {
-      print("Error loading study plan: $e");
+      print("Error loading study plan from API: $e");
       if (mounted) {
         setState(() {
           _isStudyPlanSetupComplete = false;
@@ -294,7 +259,8 @@ class _HomePageState extends State<HomePage> {
 
   void _addTask() async {
     final taskNameController = TextEditingController();
-    final durationController = TextEditingController();
+    final hoursController = TextEditingController();
+    final minutesController = TextEditingController();
     String selectedTaskCategory = 'normal';
 
     final result = await showModalBottomSheet<Map<String, dynamic>>(
@@ -302,10 +268,13 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) {
+        // Use a StatefulBuilder to manage the state of the modal independently
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter modalSetState) {
-            // By wrapping the content in a SafeArea, we ensure it respects the
-            // system navigation bar, preventing the overlap.
+            // State variables for inline error messages
+            String? hourError;
+            String? minuteError;
+
             return SafeArea(
               child: Padding(
                 padding: EdgeInsets.only(
@@ -339,16 +308,20 @@ class _HomePageState extends State<HomePage> {
                         title: const Text('Normal Task'),
                         value: 'normal',
                         groupValue: selectedTaskCategory,
-                        onChanged: (value) =>
-                            modalSetState(() => selectedTaskCategory = value!),
+                        onChanged:
+                            (value) => modalSetState(
+                              () => selectedTaskCategory = value!,
+                            ),
                         activeColor: Theme.of(context).colorScheme.primary,
                       ),
                       RadioListTile<String>(
                         title: const Text('Timed Task'),
                         value: 'timed',
                         groupValue: selectedTaskCategory,
-                        onChanged: (value) =>
-                            modalSetState(() => selectedTaskCategory = value!),
+                        onChanged:
+                            (value) => modalSetState(
+                              () => selectedTaskCategory = value!,
+                            ),
                         activeColor: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(height: 12),
@@ -377,31 +350,60 @@ class _HomePageState extends State<HomePage> {
                       ),
                       if (selectedTaskCategory == 'timed') ...[
                         const SizedBox(height: 12),
-                        TextField(
-                          controller: durationController,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Enter duration in minutes',
-                            labelText: 'Duration (minutes)',
-                            labelStyle: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: hoursController,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Hours',
+                                  labelText: 'Hours',
+                                  errorText: hourError, // Display inline error
+                                  labelStyle: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                              ),
                             ),
-                            hintStyle: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: minutesController,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Minutes',
+                                  labelText: 'Minutes',
+                                  errorText: minuteError, // Display inline error
+                                  labelStyle: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                              ),
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
                           ],
                         ),
                       ],
@@ -418,20 +420,53 @@ class _HomePageState extends State<HomePage> {
                           Expanded(
                             child: FilledButton(
                               onPressed: () {
+                                // Use the modal's own setState to show errors
+                                modalSetState(() {
+                                  hourError = null;
+                                  minuteError = null;
+                                });
+
                                 final name = taskNameController.text.trim();
                                 if (name.isEmpty) return;
+
                                 Map<String, dynamic> data = {
                                   'name': name,
                                   'category': selectedTaskCategory,
                                 };
+
                                 if (selectedTaskCategory == 'timed') {
-                                  final duration = int.tryParse(
-                                    durationController.text.trim(),
-                                  );
-                                  if (duration == null || duration <= 0) {
-                                    return;
+                                  final hours = int.tryParse(
+                                        hoursController.text.trim(),
+                                      ) ??
+                                      0;
+                                  final minutes = int.tryParse(
+                                        minutesController.text.trim(),
+                                      ) ??
+                                      0;
+
+                                  bool hasError = false;
+                                  if (hours < 0 || hours > 4) {
+                                    modalSetState(() {
+                                      hourError = 'Max 4 hours';
+                                    });
+                                    hasError = true;
                                   }
-                                  data['duration'] = duration;
+                                  if (minutes < 0 || minutes > 59) {
+                                    modalSetState(() {
+                                      minuteError = 'Max 59 mins';
+                                    });
+                                    hasError = true;
+                                  }
+                                  if ((hours == 0 && minutes == 0) &&
+                                      !hasError) {
+                                    modalSetState(() {
+                                      minuteError = 'Duration cannot be zero';
+                                    });
+                                    hasError = true;
+                                  }
+                                  if (hasError) return;
+
+                                  data['duration'] = hours * 60 + minutes;
                                 }
                                 Navigator.pop(context, data);
                               },
@@ -501,7 +536,7 @@ class _HomePageState extends State<HomePage> {
             ).textTheme.titleLarge?.copyWith(color: textColor),
           ),
           content: Text(
-            'Are you sure you want to delete "${taskToDelete.name}"?',
+            'Are you sure you want to delete the task, "${taskToDelete.name}"? This cannot be undone.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: textColor),
@@ -805,6 +840,7 @@ class _HomePageState extends State<HomePage> {
       StudyPlannerScreen(
         onSetupStateChanged: _updateTimetableSetupState,
         apiService: _apiService,
+        onTaskCompleted: _fetchDataFromServer,
       ),
     ];
 
@@ -944,8 +980,7 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton:
           _selectedIndex == 0
               ? FloatingActionButton.extended(
-                heroTag:
-                    'add_task_fab', 
+                heroTag: 'add_task_fab',
                 onPressed: _addTask,
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add Task'),
@@ -964,7 +999,6 @@ class _HomePageState extends State<HomePage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Determine the number of columns based on screen width
         final double screenWidth = constraints.maxWidth;
         final int crossAxisCount = screenWidth > 600 ? 4 : 2;
 
@@ -1003,23 +1037,29 @@ class _HomePageState extends State<HomePage> {
                             pageBuilder:
                                 (context, animation, secondaryAnimation) =>
                                     AllTasksScreen(
-                              tasks: tasks,
-                              allPendingTasks: pendingTasks,
-                              onCompleteTask: _completeTask,
-                              onDeleteTask: _deleteTask,
-                              buildTaskIcon: _buildTaskIcon,
-                              buildTaskSubtitle: _buildTaskSubtitle,
-                              apiService: _apiService,
-                              onTaskCompleted: _fetchDataFromServer,
-                            ),
-                            transitionsBuilder: (context, animation,
-                                secondaryAnimation, child) {
+                                      tasks: tasks,
+                                      allPendingTasks: pendingTasks,
+                                      onCompleteTask: _completeTask,
+                                      onDeleteTask: _deleteTask,
+                                      buildTaskIcon: _buildTaskIcon,
+                                      buildTaskSubtitle: _buildTaskSubtitle,
+                                      apiService: _apiService,
+                                      onTaskCompleted: _fetchDataFromServer,
+                                    ),
+                            transitionsBuilder: (
+                              context,
+                              animation,
+                              secondaryAnimation,
+                              child,
+                            ) {
                               const begin = Offset(1.0, 0.0);
                               const end = Offset.zero;
                               const curve = Curves.easeInOutCubic;
 
-                              var tween = Tween(begin: begin, end: end)
-                                  .chain(CurveTween(curve: curve));
+                              var tween = Tween(
+                                begin: begin,
+                                end: end,
+                              ).chain(CurveTween(curve: curve));
                               var offsetAnimation = animation.drive(tween);
 
                               return SlideTransition(
@@ -1054,7 +1094,8 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ],
-            if (_isStudyPlanSetupComplete) ...[
+            // Show the Study Plan section only if it's set up and has tasks for today.
+            if (_isStudyPlanSetupComplete && _todaysStudyPlan.isNotEmpty) ...[
               const SizedBox(height: 24.0),
               Text(
                 "Study Plan",
@@ -1065,25 +1106,24 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              if (_todaysStudyPlan.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16.0),
-                  child: Text("Nothing scheduled for today. Enjoy your break!"),
-                )
-              else ...[
-                ..._todaysStudyPlan
-                    .take(_showAllStudyTasks ? _todaysStudyPlan.length : 3)
-                    .map((task) => _buildStudyPlanTile(task)),
-                if (_todaysStudyPlan.length > 3)
-                  TextButton(
-                    onPressed: () => setState(
-                      () => _showAllStudyTasks = !_showAllStudyTasks,
-                    ),
-                    child:
-                        Text(_showAllStudyTasks ? 'Show Less' : 'Show More...'),
+              // Display up to 3 study plan items for the current day.
+              ..._todaysStudyPlan
+                  .take(3)
+                  .map((task) => _buildStudyPlanTile(task)),
+              // If there are more than 3 tasks, show a button to navigate to the planner.
+              if (_todaysStudyPlan.length > 3)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 2; // Switch to the Study Planner tab
+                      });
+                    },
+                    child: const Text('Show More...'),
                   ),
-              ],
-            ]
+                ),
+            ],
           ],
         );
       },

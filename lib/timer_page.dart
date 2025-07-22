@@ -40,13 +40,17 @@ class _TimerPageState extends State<TimerPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  String _formatDuration(int totalSeconds) {
+  String _formatDuration(int totalSeconds, {bool forceHour = false}) {
     final duration = Duration(seconds: totalSeconds);
     String twoDigits(int n) => n.toString().padLeft(2, "0");
     final hours = twoDigits(duration.inHours);
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return "$hours:$minutes:$seconds";
+    if (forceHour || duration.inHours > 0) {
+      return "$hours:$minutes:$seconds";
+    } else {
+      return "$minutes:$seconds";
+    }
   }
 
   void _startTimer() {
@@ -155,12 +159,17 @@ class _TimerPageState extends State<TimerPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 10),
               Text(
-                _formatDuration(_elapsedSeconds),
-                style: GoogleFonts.orbitron(
-                  fontSize: 60,
+                _formatDuration(
+                  _elapsedSeconds,
+                  forceHour: _targetDurationSeconds >= 3600,
+                ),
+                style: GoogleFonts.gabarito(
+                  fontSize: 56,
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: 2,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
               Row(

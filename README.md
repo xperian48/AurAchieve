@@ -1,14 +1,14 @@
-# AuraAscend
+# AurAchieve
 
 **Fix your damn life.**
 
-AuraAscend is the only self-improvement app you'll ever need. Earn Aura for every good thing you do. Prove it with AI, a timer, or just your honesty.
+AurAchieve is the only self-improvement app you'll ever need. Earn Aura for every good thing you do. Prove it with AI, a timer, or just your honesty.
 
-Get it now through [GitHub actions](https://github.com/NiceSapien/AuraAscend/actions).
+Get it now through [GitHub actions](https://github.com/NiceSapien/AurAchieve/actions).
 
 ## Self-hosting
 
-If you wish to self-host AuraAscend for some reason, you'll have to clone the [backend](https://github.com/NiceSapien/AuraAscend-backend) repository aswell, written in ExpressJS. The instructions to setup the backend are present in the repository readme.
+If you wish to self-host AurAchieve for some reason, you'll have to clone the [backend](https://github.com/NiceSapien/AurAchieve-backend) repository aswell, written in ExpressJS. The instructions to setup the backend are present in the repository readme.
 
 To setup the frontend:
 
@@ -53,14 +53,14 @@ There's not much about contributing yet. Make sure to deploy your own backend an
 
 Currently, there are no sponsors.
 
-If you appreciate AuraAscend and want to keep it free for everyone, please [sponsor](https://github.com/sponsors/NiceSapien) me. You can also do this through [patreon](https://patreon.com/nicesapien), but GitHub sponsors is preferred over Patreon as it charges less. The codebase is provided under the MIT license absolutely free of charge, forever.
+If you appreciate AurAchieve and want to keep it free for everyone, please [sponsor](https://github.com/sponsors/NiceSapien) me. You can also do this through [patreon](https://patreon.com/nicesapien), but GitHub sponsors is preferred over Patreon as it charges less. The codebase is provided under the MIT license absolutely free of charge, forever.
 
 
 
 Current goals:
 
-Any amount - Show appreciation and help keep AuraAscend free
+Any amount - Show appreciation and help keep AurAchieve free
 
 **20$** - Buy a domain for the website
 
-**100$** - Publish AuraAscend on the Apple App Store
+**100$** - Publish AurAchieve on the Apple App Store
