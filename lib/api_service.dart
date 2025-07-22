@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl =
-      'https://redesigned-robot-j9p7vgg64gp2r75-4000.app.github.dev';
+      'https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net';
   final Account account;
   final _storage = const FlutterSecureStorage();
 

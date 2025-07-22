@@ -145,9 +145,10 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         if (plan != null) {
           final subjectsJson = plan['subjects'] as List? ?? [];
-          final subjects = subjectsJson
-              .map((s) => Subject.fromJson(s as Map<String, dynamic>))
-              .toList();
+          final subjects =
+              subjectsJson
+                  .map((s) => Subject.fromJson(s as Map<String, dynamic>))
+                  .toList();
 
           final timetableJson = plan['timetable'] as List? ?? [];
           final today = DateUtils.dateOnly(DateTime.now());
@@ -268,10 +269,8 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) {
-        // Use a StatefulBuilder to manage the state of the modal independently
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter modalSetState) {
-            // State variables for inline error messages
             String? hourError;
             String? minuteError;
 
@@ -357,16 +356,18 @@ class _HomePageState extends State<HomePage> {
                               child: TextField(
                                 controller: hoursController,
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: 'Hours',
                                   labelText: 'Hours',
-                                  errorText: hourError, // Display inline error
+                                  errorText: hourError,
                                   labelStyle: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -383,16 +384,18 @@ class _HomePageState extends State<HomePage> {
                               child: TextField(
                                 controller: minutesController,
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: 'Minutes',
                                   labelText: 'Minutes',
-                                  errorText: minuteError, // Display inline error
+                                  errorText: minuteError,
                                   labelStyle: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -420,7 +423,6 @@ class _HomePageState extends State<HomePage> {
                           Expanded(
                             child: FilledButton(
                               onPressed: () {
-                                // Use the modal's own setState to show errors
                                 modalSetState(() {
                                   hourError = null;
                                   minuteError = null;
@@ -435,11 +437,13 @@ class _HomePageState extends State<HomePage> {
                                 };
 
                                 if (selectedTaskCategory == 'timed') {
-                                  final hours = int.tryParse(
+                                  final hours =
+                                      int.tryParse(
                                         hoursController.text.trim(),
                                       ) ??
                                       0;
-                                  final minutes = int.tryParse(
+                                  final minutes =
+                                      int.tryParse(
                                         minutesController.text.trim(),
                                       ) ??
                                       0;
@@ -1094,7 +1098,7 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ],
-            // Show the Study Plan section only if it's set up and has tasks for today.
+
             if (_isStudyPlanSetupComplete && _todaysStudyPlan.isNotEmpty) ...[
               const SizedBox(height: 24.0),
               Text(
@@ -1106,18 +1110,18 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              // Display up to 3 study plan items for the current day.
+
               ..._todaysStudyPlan
                   .take(3)
                   .map((task) => _buildStudyPlanTile(task)),
-              // If there are more than 3 tasks, show a button to navigate to the planner.
+
               if (_todaysStudyPlan.length > 3)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
                       setState(() {
-                        _selectedIndex = 2; // Switch to the Study Planner tab
+                        _selectedIndex = 2;
                       });
                     },
                     child: const Text('Show More...'),

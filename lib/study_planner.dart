@@ -531,7 +531,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          // If today has no tasks, show a break day tile.
+
           if ((todaySchedule['tasks'] as List).isEmpty)
             _buildTaskTile({'type': 'break'}, todaySchedule['date'] as String)
           else
@@ -566,7 +566,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                           ),
                         ),
                       ),
-                      // If a future day has no tasks, show a break day tile.
+
                       if ((day['tasks'] as List).isEmpty)
                         _buildTaskTile({'type': 'break'}, day['date'] as String)
                       else
@@ -646,7 +646,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     Map<String, dynamic> item,
     String dateOfTask, {
     bool isFeedback = false,
-    bool isPreview = false, // Add this flag to control preview appearance
+    bool isPreview = false,
   }) {
     IconData icon;
     Widget title;
@@ -745,7 +745,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (trailing != null) trailing,
-            // Hide checkbox if it's a break, feedback, or in preview mode
+
             if (item['type'] != 'break' && !isFeedback && !isPreview)
               Checkbox(
                 value: (item['completed'] as bool?) ?? false,
@@ -785,7 +785,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                 !_isNextEnabled() || (_currentPage == 5 && _isGenerating)
                     ? null
                     : () {
-                      // When leaving the subjects page, unfocus the text field
                       if (_currentPage == 1) {
                         FocusScope.of(context).unfocus();
                       }
@@ -1119,7 +1118,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                         final date = DateTime.parse(day['date'] as String);
                         final tasks = day['tasks'] as List;
 
-                        // Each day is a target to accept dragged tasks
                         return DragTarget<Map<String, dynamic>>(
                           builder: (context, candidateData, rejectedData) {
                             return Card(
@@ -1147,7 +1145,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                         ),
                                       ),
                                     ),
-                                    // If a day has no tasks, show a break day tile
+
                                     if (tasks.isEmpty)
                                       _buildTaskTile(
                                         {'type': 'break'},
@@ -1156,14 +1154,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                       )
                                     else
                                       ...tasks.map((task) {
-                                        // Each task is a draggable item
                                         return Draggable<Map<String, dynamic>>(
-                                          // Data to identify the task and its origin
                                           data: {
                                             'task': task,
                                             'sourceDate': day['date'],
                                           },
-                                          // How the task looks while being dragged
+
                                           feedback: Material(
                                             elevation: 4.0,
                                             child: ConstrainedBox(
@@ -1182,7 +1178,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                               ),
                                             ),
                                           ),
-                                          // How the original space looks
+
                                           childWhenDragging: Opacity(
                                             opacity: 0.5,
                                             child: _buildTaskTile(
@@ -1191,7 +1187,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                               isPreview: true,
                                             ),
                                           ),
-                                          // The task tile itself
+
                                           child: _buildTaskTile(
                                             task,
                                             day['date'],
@@ -1204,42 +1200,49 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                               ),
                             );
                           },
-                          // Logic to handle the drop
+
                           onAccept: (data) {
-                            final taskToMove = data['task'] as Map<String, dynamic>;
+                            final taskToMove =
+                                data['task'] as Map<String, dynamic>;
                             final sourceDateStr = data['sourceDate'] as String;
                             final targetDateStr = day['date'] as String;
 
-                            // Prevent dropping a task back onto its own day
                             if (sourceDateStr == targetDateStr) return;
 
                             setState(() {
-                              // Find the indices for source and target days
-                              final sourceIndex = _generatedTimetable.indexWhere(
-                                (d) => d['date'] == sourceDateStr,
-                              );
-                              final targetIndex = _generatedTimetable.indexWhere(
-                                (d) => d['date'] == targetDateStr,
+                              final sourceIndex = _generatedTimetable
+                                  .indexWhere(
+                                    (d) => d['date'] == sourceDateStr,
+                                  );
+                              final targetIndex = _generatedTimetable
+                                  .indexWhere(
+                                    (d) => d['date'] == targetDateStr,
+                                  );
+
+                              if (sourceIndex == -1 || targetIndex == -1)
+                                return;
+
+                              final sourceTasks =
+                                  List<Map<String, dynamic>>.from(
+                                    _generatedTimetable[sourceIndex]['tasks']
+                                        as List,
+                                  );
+                              final targetTasks =
+                                  List<Map<String, dynamic>>.from(
+                                    _generatedTimetable[targetIndex]['tasks']
+                                        as List,
+                                  );
+
+                              sourceTasks.removeWhere(
+                                (t) => t['id'] == taskToMove['id'],
                               );
 
-                              if (sourceIndex == -1 || targetIndex == -1) return;
-
-                              // Create new lists to avoid in-place mutation bugs
-                              final sourceTasks = List<Map<String, dynamic>>.from(
-                                _generatedTimetable[sourceIndex]['tasks'] as List,
-                              );
-                              final targetTasks = List<Map<String, dynamic>>.from(
-                                _generatedTimetable[targetIndex]['tasks'] as List,
-                              );
-
-                              // Remove the task from the source day
-                              sourceTasks.removeWhere((t) => t['id'] == taskToMove['id']);
-                              // Add the task to the target day
                               targetTasks.add(taskToMove);
 
-                              // Assign the new lists back to the timetable
-                              _generatedTimetable[sourceIndex]['tasks'] = sourceTasks;
-                              _generatedTimetable[targetIndex]['tasks'] = targetTasks;
+                              _generatedTimetable[sourceIndex]['tasks'] =
+                                  sourceTasks;
+                              _generatedTimetable[targetIndex]['tasks'] =
+                                  targetTasks;
                             });
                           },
                         );
