@@ -12,6 +12,41 @@ jobs:
   #----------------------------------------------------
   # Build Android APK
   #----------------------------------------------------
+ build_android:
+    name: Build Flutter (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          # cache: true
+
+      # Use 'pub upgrade' instead of 'pub get' to fetch latest plugin versions
+      # This is needed to resolve v1/v2 Android embedding issues (e.g., path_provider_android)
+      - name: Upgrade Flutter dependencies
+        run: flutter pub upgrade # Changed from 'flutter pub get'
+
+      # NOTE: Analyze and test steps removed.
+
+      - name: Build Flutter APK (Debug)
+        run: flutter build apk --debug
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+  
   #----------------------------------------------------
   # Build iOS (Requires macOS runner)
   #----------------------------------------------------
@@ -76,7 +111,8 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: unsigned-ios-ipa
-        path: AurAchieve.ipa # This path points to the IPA created in the previous step
+        path: AurAchieve.IPA
+        
     - name: Upload Podfile
       uses: actions/upload-artifact@v4
       with:
