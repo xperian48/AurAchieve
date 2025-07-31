@@ -21,6 +21,7 @@ import 'screens/auth_check_screen.dart';
 import 'timer_page.dart';
 import 'study_planner.dart';
 import 'screens/extended_task_list.dart';
+import 'habits.dart';
 
 enum AuraHistoryView { day, month, year }
 
@@ -99,6 +100,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _todaysStudyPlan = [];
   List<Subject> _subjects = [];
   bool _isStudyPlanSetupComplete = false;
+  bool _showQuote = true;
 
   List<DateTime?> auraDatesForView = [];
 
@@ -424,8 +426,8 @@ class _HomePageState extends State<HomePage> {
                             child: FilledButton(
                               onPressed: () {
                                 modalSetState(() {
-                                  hourError = null;
-                                  minuteError = null;
+                                  hourError = 'Max 4 hours';
+                                  minuteError = 'Max 59 mins';
                                 });
 
                                 final name = taskNameController.text.trim();
@@ -840,6 +842,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final List<Widget> _widgetOptions = <Widget>[
       _buildDashboardView(),
+      HabitsPage(),
       SocialMediaBlockerScreen(apiService: _apiService),
       StudyPlannerScreen(
         onSetupStateChanged: _updateTimetableSetupState,
@@ -965,6 +968,10 @@ class _HomePageState extends State<HomePage> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.repeat_rounded),
+            label: 'Habits',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.no_cell_rounded),
             label: 'Social Blocker',
           ),
@@ -975,6 +982,7 @@ class _HomePageState extends State<HomePage> {
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
@@ -1015,6 +1023,68 @@ class _HomePageState extends State<HomePage> {
               _buildEmptyTasksView()
             else ...[
               const SizedBox(height: 8),
+              if (_showQuote)
+                Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(top: 16, bottom: 8),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          width: 5,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            '"Oh yes, the past can hurt. But, you can either run from it or learn from it."',
+                            style: GoogleFonts.gabarito(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onSecondaryContainer,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              "- The Lion King",
+                              style: GoogleFonts.ebGaramond(
+                                fontSize: 14,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      right: 4,
+                      child: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _showQuote = false;
+                          });
+                        },
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                      ),
+                    ),
+                  ],
+                ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
