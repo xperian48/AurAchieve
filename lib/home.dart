@@ -67,12 +67,11 @@ class Task {
       intensity: json['intensity'] ?? 'easy',
       type: json['type'] ?? 'good',
       taskCategory: json['taskCategory'] ?? 'normal',
-      durationMinutes:
-          json['durationMinutes'] is int
-              ? json['durationMinutes']
-              : (json['durationMinutes'] is String
-                  ? int.tryParse(json['durationMinutes'])
-                  : null),
+      durationMinutes: json['durationMinutes'] is int
+          ? json['durationMinutes']
+          : (json['durationMinutes'] is String
+                ? int.tryParse(json['durationMinutes'])
+                : null),
       isImageVerifiable: json['isImageVerifiable'] ?? false,
       status: json['status'] ?? 'pending',
       userId: json['userId'] ?? '',
@@ -147,10 +146,9 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         if (plan != null) {
           final subjectsJson = plan['subjects'] as List? ?? [];
-          final subjects =
-              subjectsJson
-                  .map((s) => Subject.fromJson(s as Map<String, dynamic>))
-                  .toList();
+          final subjects = subjectsJson
+              .map((s) => Subject.fromJson(s as Map<String, dynamic>))
+              .toList();
 
           final timetableJson = plan['timetable'] as List? ?? [];
           final today = DateUtils.dateOnly(DateTime.now());
@@ -164,10 +162,9 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _isStudyPlanSetupComplete = true;
             _subjects = subjects;
-            _todaysStudyPlan =
-                (todaySchedule['tasks'] as List? ?? [])
-                    .map((t) => Map<String, dynamic>.from(t))
-                    .toList();
+            _todaysStudyPlan = (todaySchedule['tasks'] as List? ?? [])
+                .map((t) => Map<String, dynamic>.from(t))
+                .toList();
           });
         } else {
           setState(() {
@@ -197,16 +194,14 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
-          tasks =
-              fetchedTasks
-                  .map((taskJson) => Task.fromJson(taskJson))
-                  .where((task) => task.status == 'pending')
-                  .toList();
-          completedTasks =
-              fetchedTasks
-                  .map((taskJson) => Task.fromJson(taskJson))
-                  .where((task) => task.status == 'completed')
-                  .toList();
+          tasks = fetchedTasks
+              .map((taskJson) => Task.fromJson(taskJson))
+              .where((task) => task.status == 'pending')
+              .toList();
+          completedTasks = fetchedTasks
+              .map((taskJson) => Task.fromJson(taskJson))
+              .where((task) => task.status == 'completed')
+              .toList();
 
           _userProfile = fetchedProfile;
           aura = fetchedProfile['aura'] ?? 50;
@@ -217,16 +212,14 @@ class _HomePageState extends State<HomePage> {
               auraHistory = auraHistory.sublist(auraHistory.length - 8);
             }
           }
-          auraDates =
-              completedTasks
-                  .map(
-                    (t) =>
-                        t.completedAt != null
-                            ? DateTime.tryParse(t.completedAt!)
-                            : null,
-                  )
-                  .where((d) => d != null)
-                  .toList();
+          auraDates = completedTasks
+              .map(
+                (t) => t.completedAt != null
+                    ? DateTime.tryParse(t.completedAt!)
+                    : null,
+              )
+              .where((d) => d != null)
+              .toList();
         });
       }
     } catch (e, s) {
@@ -234,7 +227,10 @@ class _HomePageState extends State<HomePage> {
       print("Debug: _fetchDataFromServer: Stacktrace: $s");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching data: ${e.toString()}')),
+          SnackBar(
+            content: Text('Error fetching data: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         _userProfile = null;
       }
@@ -269,7 +265,7 @@ class _HomePageState extends State<HomePage> {
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surfaceBright,
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter modalSetState) {
@@ -309,20 +305,16 @@ class _HomePageState extends State<HomePage> {
                         title: const Text('Normal Task'),
                         value: 'normal',
                         groupValue: selectedTaskCategory,
-                        onChanged:
-                            (value) => modalSetState(
-                              () => selectedTaskCategory = value!,
-                            ),
+                        onChanged: (value) =>
+                            modalSetState(() => selectedTaskCategory = value!),
                         activeColor: Theme.of(context).colorScheme.primary,
                       ),
                       RadioListTile<String>(
                         title: const Text('Timed Task'),
                         value: 'timed',
                         groupValue: selectedTaskCategory,
-                        onChanged:
-                            (value) => modalSetState(
-                              () => selectedTaskCategory = value!,
-                            ),
+                        onChanged: (value) =>
+                            modalSetState(() => selectedTaskCategory = value!),
                         activeColor: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(height: 12),
@@ -336,8 +328,9 @@ class _HomePageState extends State<HomePage> {
                           hintText: 'Enter task name',
                           labelText: 'Task Name',
                           labelStyle: TextStyle(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           hintStyle: TextStyle(
                             color: Theme.of(
@@ -358,18 +351,18 @@ class _HomePageState extends State<HomePage> {
                               child: TextField(
                                 controller: hoursController,
                                 style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: 'Hours',
+                                  hintText: 'Upto 4 hours',
                                   labelText: 'Hours',
                                   errorText: hourError,
                                   labelStyle: TextStyle(
-                                    color:
-                                        Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -386,18 +379,18 @@ class _HomePageState extends State<HomePage> {
                               child: TextField(
                                 controller: minutesController,
                                 style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: 'Minutes',
+                                  hintText: 'Upto 59 minutes',
                                   labelText: 'Minutes',
                                   errorText: minuteError,
                                   labelStyle: TextStyle(
-                                    color:
-                                        Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -507,7 +500,10 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to add task: ${e.toString()}')),
+            SnackBar(
+              content: Text('Failed to add task: ${e.toString()}'),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       } finally {
@@ -522,7 +518,10 @@ class _HomePageState extends State<HomePage> {
     final pendingTasks = tasks.where((t) => t.status == 'pending').toList();
     if (index < 0 || index >= pendingTasks.length) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Task index out of bounds.')),
+        const SnackBar(
+          content: Text('Error: Task index out of bounds.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -581,7 +580,10 @@ class _HomePageState extends State<HomePage> {
         if (mounted) {
           setState(() => isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete task: ${e.toString()}')),
+            SnackBar(
+              content: Text('Failed to delete task: ${e.toString()}'),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       }
@@ -591,7 +593,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> _completeTask(int index) async {
     if (index < 0 || index >= tasks.length) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error completing task: Invalid index.")),
+        SnackBar(
+          content: Text("Error completing task: Invalid index."),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -699,7 +704,10 @@ class _HomePageState extends State<HomePage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Task "${task.name}" marked as bad.')),
+          SnackBar(
+            content: Text('Task "${task.name}" marked as bad.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
@@ -708,6 +716,7 @@ class _HomePageState extends State<HomePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to mark task as bad: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -857,7 +866,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
           'AurAchieve',
-          style: GoogleFonts.gabarito(
+          style: GoogleFonts.ebGaramond(
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Theme.of(context).colorScheme.primary,
@@ -872,18 +881,27 @@ class _HomePageState extends State<HomePage> {
               color: Theme.of(context).colorScheme.primary,
             ),
             tooltip: 'Stats',
+            onLongPress: () async {
+              Clipboard.setData(
+                ClipboardData(text: await _apiService.getJwtToken() ?? ''),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('JWT token copied lil bro'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder:
-                      (context) => StatsPage(
-                        aura: aura,
-                        tasks:
-                            tasks.where((t) => t.status == 'pending').toList(),
-                        auraHistory: getAuraHistoryForView(),
-                        auraDates: getAuraDatesForView(),
-                        completedTasks: completedTasks,
-                      ),
+                  builder: (context) => StatsPage(
+                    aura: aura,
+                    tasks: tasks.where((t) => t.status == 'pending').toList(),
+                    auraHistory: getAuraHistoryForView(),
+                    auraDates: getAuraDatesForView(),
+                    completedTasks: completedTasks,
+                  ),
                 ),
               );
             },
@@ -898,111 +916,118 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                children: [
-                  if (!(_selectedIndex == 2 && _isTimetableSetupInProgress))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: RichText(
-                          text: TextSpan(
-                            style: GoogleFonts.ebGaramond(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                            children: [
-                              const TextSpan(text: 'Hi, '),
-                              TextSpan(
-                                text: userName,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              const TextSpan(text: '!'),
-                            ],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                if (!(_selectedIndex == 3 && _isTimetableSetupInProgress))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.ebGaramond(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
+                          children: [
+                            const TextSpan(text: 'Hi, '),
+                            TextSpan(
+                              text: userName,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const TextSpan(text: '!'),
+                          ],
                         ),
                       ),
                     ),
-                  if (!(_selectedIndex == 2 && _isTimetableSetupInProgress))
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.auto_awesome_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 26,
+                  ),
+                if (!(_selectedIndex == 3 && _isTimetableSetupInProgress))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 26,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Your Aura: $aura',
+                          style: GoogleFonts.gabarito(
+                            fontSize: 18,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            letterSpacing: 0.5,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Your Aura: $aura',
-                            style: GoogleFonts.gabarito(
-                              fontSize: 18,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (!(_selectedIndex == 2 && _isTimetableSetupInProgress))
-                    const SizedBox(height: 16),
-                  Expanded(
-                    child: IndexedStack(
-                      index: _selectedIndex,
-                      children: _widgetOptions,
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.repeat_rounded),
-            label: 'Habits',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.no_cell_rounded),
-            label: 'Social Blocker',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school_outlined),
-            label: 'Study Planner',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        onTap: (index) {
+                if (!(_selectedIndex == 3 && _isTimetableSetupInProgress))
+                  const SizedBox(height: 16),
+                Expanded(
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: _widgetOptions,
+                  ),
+                ),
+              ],
+            ),
+      bottomNavigationBar: NavigationBar(
+        onDestinationSelected: (int index) {
           setState(() {
             _selectedIndex = index;
           });
         },
+        selectedIndex: _selectedIndex,
+        destinations: const <NavigationDestination>[
+          NavigationDestination(
+            selectedIcon: Icon(Icons.home_rounded),
+            icon: Icon(Icons.home_outlined),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.repeat_outlined),
+            label: 'Habits',
+          ),
+          NavigationDestination(
+            selectedIcon: Icon(Icons.no_cell_rounded),
+            icon: Icon(Icons.no_cell_outlined),
+            label: 'Blocker',
+          ),
+          NavigationDestination(
+            selectedIcon: Icon(Icons.school_rounded),
+            icon: Icon(Icons.school_outlined),
+            label: 'Planner',
+          ),
+        ],
+        //   currentIndex: _selectedIndex,
+        // selectedItemColor: Theme.of(context).colorScheme.primary,
+        //unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
+        /* onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },*/
       ),
-      floatingActionButton:
-          _selectedIndex == 0
-              ? FloatingActionButton.extended(
-                heroTag: 'add_task_fab',
-                onPressed: _addTask,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Task'),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              )
-              : null,
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton.extended(
+              heroTag: 'add_task_fab',
+              onPressed: _addTask,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Task'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            )
+          : null,
     );
   }
 
@@ -1022,20 +1047,25 @@ class _HomePageState extends State<HomePage> {
             if (pendingTasks.isEmpty)
               _buildEmptyTasksView()
             else ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               if (_showQuote)
                 Stack(
                   children: [
                     Container(
                       width: double.infinity,
-                      margin: const EdgeInsets.only(top: 16, bottom: 8),
-                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(top: 16, bottom: 12),
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        top: 20,
+                        bottom: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.secondaryContainer,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: Theme.of(context).colorScheme.outlineVariant,
-                          width: 5,
+                          width: 1.5,
                         ),
                       ),
                       child: Column(
@@ -1046,10 +1076,9 @@ class _HomePageState extends State<HomePage> {
                             style: GoogleFonts.gabarito(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
-                              color:
-                                  Theme.of(
-                                    context,
-                                  ).colorScheme.onSecondaryContainer,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSecondaryContainer,
                               fontStyle: FontStyle.italic,
                             ),
                             textAlign: TextAlign.center,
@@ -1061,10 +1090,9 @@ class _HomePageState extends State<HomePage> {
                               "- The Lion King",
                               style: GoogleFonts.ebGaramond(
                                 fontSize: 14,
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).colorScheme.onSecondaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSecondaryContainer,
                               ),
                             ),
                           ),
@@ -1072,8 +1100,8 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     Positioned(
-                      top: 12,
-                      right: 4,
+                      top: 6,
+                      right: 0,
                       child: IconButton(
                         onPressed: () {
                           setState(() {
@@ -1120,30 +1148,6 @@ class _HomePageState extends State<HomePage> {
                                       apiService: _apiService,
                                       onTaskCompleted: _fetchDataFromServer,
                                     ),
-                            transitionsBuilder: (
-                              context,
-                              animation,
-                              secondaryAnimation,
-                              child,
-                            ) {
-                              const begin = Offset(1.0, 0.0);
-                              const end = Offset.zero;
-                              const curve = Curves.easeInOutCubic;
-
-                              var tween = Tween(
-                                begin: begin,
-                                end: end,
-                              ).chain(CurveTween(curve: curve));
-                              var offsetAnimation = animation.drive(tween);
-
-                              return SlideTransition(
-                                position: offsetAnimation,
-                                child: FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                ),
-                              );
-                            },
                           ),
                         );
                       },
@@ -1217,14 +1221,13 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder:
-                      (_) => TimerPage(
-                        task: task,
-                        apiService: _apiService,
-                        onTaskCompleted: () {
-                          _fetchDataFromServer();
-                        },
-                      ),
+                  builder: (_) => TimerPage(
+                    task: task,
+                    apiService: _apiService,
+                    onTaskCompleted: () {
+                      _fetchDataFromServer();
+                    },
+                  ),
                 ),
               );
             } else if (task.status == "pending") {
@@ -1235,12 +1238,12 @@ class _HomePageState extends State<HomePage> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(20),
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: Theme.of(
                   context,
-                ).colorScheme.outlineVariant.withOpacity(0.3),
+                ).colorScheme.outlineVariant.withValues(alpha: 0.3),
                 width: 1.5,
               ),
             ),
@@ -1267,10 +1270,9 @@ class _HomePageState extends State<HomePage> {
                       style: GoogleFonts.gabarito(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color:
-                            task.type == 'bad'
-                                ? Theme.of(context).colorScheme.error
-                                : Theme.of(context).colorScheme.primary,
+                        color: task.type == 'bad'
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -1302,12 +1304,8 @@ class _HomePageState extends State<HomePage> {
         final content = item['content'] as Map<String, dynamic>;
         final subject = _subjects.firstWhere(
           (s) => s.name == content['subject'],
-          orElse:
-              () => Subject(
-                name: 'Unknown',
-                icon: Icons.help,
-                color: Colors.grey,
-              ),
+          orElse: () =>
+              Subject(name: 'Unknown', icon: Icons.help, color: Colors.grey),
         );
         icon = subject.icon;
         avatarColor = subject.color;
@@ -1318,12 +1316,8 @@ class _HomePageState extends State<HomePage> {
         final content = item['content'] as Map<String, dynamic>;
         final subject = _subjects.firstWhere(
           (s) => s.name == content['subject'],
-          orElse:
-              () => Subject(
-                name: 'Unknown',
-                icon: Icons.help,
-                color: Colors.grey,
-              ),
+          orElse: () =>
+              Subject(name: 'Unknown', icon: Icons.help, color: Colors.grey),
         );
         icon = Icons.history_outlined;
         avatarColor = subject.color.withOpacity(0.7);
@@ -1443,14 +1437,13 @@ class _HomePageState extends State<HomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder:
-                            (_) => TimerPage(
-                              task: task,
-                              apiService: _apiService,
-                              onTaskCompleted: () {
-                                _fetchDataFromServer();
-                              },
-                            ),
+                        builder: (_) => TimerPage(
+                          task: task,
+                          apiService: _apiService,
+                          onTaskCompleted: () {
+                            _fetchDataFromServer();
+                          },
+                        ),
                       ),
                     );
                   } else if (task.status == "pending") {
@@ -1563,10 +1556,9 @@ class _HomePageState extends State<HomePage> {
                 ? Icons.camera_alt_outlined
                 : Icons.check_circle_outline,
             size: 14,
-            color:
-                task.isImageVerifiable
-                    ? Colors.blueGrey
-                    : Colors.green.shade700,
+            color: task.isImageVerifiable
+                ? Colors.blueGrey
+                : Colors.green.shade700,
           ),
         );
         subtitleChildren.add(SizedBox(width: 2));
@@ -1575,10 +1567,9 @@ class _HomePageState extends State<HomePage> {
             task.isImageVerifiable ? "Photo" : "Honor",
             style: GoogleFonts.gabarito(
               fontSize: 11,
-              color:
-                  task.isImageVerifiable
-                      ? Colors.blueGrey
-                      : Colors.green.shade700,
+              color: task.isImageVerifiable
+                  ? Colors.blueGrey
+                  : Colors.green.shade700,
             ),
           ),
         );
@@ -1643,8 +1634,9 @@ class _HomePageState extends State<HomePage> {
         );
       default:
         return CircleAvatar(
-          backgroundColor:
-              Theme.of(context).colorScheme.surfaceContainerHighest,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest,
           child: Icon(
             Icons.task_alt_rounded,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

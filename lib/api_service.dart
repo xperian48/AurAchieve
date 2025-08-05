@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:appwrite/appwrite.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -11,13 +12,13 @@ class ApiService {
   final _storage = const FlutterSecureStorage();
 
   ApiService({required this.account});
-
-  Future<String?> _getJwtToken() async {
+  // temporarily publiced getJwtToken. Rename it to _getJwtToken later
+  Future<String?> getJwtToken() async {
     return await _storage.read(key: 'jwt_token');
   }
 
   Future<Map<String, String>> _getHeaders() async {
-    final token = await _getJwtToken();
+    final token = await getJwtToken();
     if (token == null) {
       print('JWT token not found for API request.');
       throw Exception('Authentication token not found.');

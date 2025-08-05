@@ -133,10 +133,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           _studyPlan = plan;
           _isSetupComplete = true;
           final subjectsJson = plan['subjects'] as List;
-          _subjects =
-              subjectsJson
-                  .map((s) => Subject.fromJson(s as Map<String, dynamic>))
-                  .toList();
+          _subjects = subjectsJson
+              .map((s) => Subject.fromJson(s as Map<String, dynamic>))
+              .toList();
 
           _chapters = (plan['chapters'] as Map<String, dynamic>).map(
             (key, value) => MapEntry(
@@ -150,18 +149,16 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           _deadline = DateTime.tryParse(plan['deadline']);
 
           final timetableJson = plan['timetable'] as List;
-          _generatedTimetable =
-              timetableJson
-                  .map(
-                    (e) => {
-                      'date': (e['date'] as String),
-                      'tasks':
-                          (e['tasks'] as List)
-                              .map((t) => Map<String, dynamic>.from(t))
-                              .toList(),
-                    },
-                  )
-                  .toList();
+          _generatedTimetable = timetableJson
+              .map(
+                (e) => {
+                  'date': (e['date'] as String),
+                  'tasks': (e['tasks'] as List)
+                      .map((t) => Map<String, dynamic>.from(t))
+                      .toList(),
+                },
+              )
+              .toList();
         });
       } else {
         setState(() {
@@ -189,34 +186,33 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   Future<void> _resetTimetable() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Reset Study Plan?',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            content: Text(
-              'Are you sure you want to delete your current study plan and start over? This action cannot be undone.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                ),
-                child: const Text('Reset'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Reset Study Plan?',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
           ),
+        ),
+        content: Text(
+          'Are you sure you want to delete your current study plan and start over? This action cannot be undone.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
     );
 
     if (confirm == true) {
@@ -288,9 +284,8 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
     final selectedNumbers = await showDialog<Set<int>>(
       context: context,
-      builder:
-          (context) =>
-              ChapterPickerDialog(initialChapters: existingChapterNumbers),
+      builder: (context) =>
+          ChapterPickerDialog(initialChapters: existingChapterNumbers),
     );
 
     if (selectedNumbers != null) {
@@ -319,54 +314,52 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
   void _editChapterName(String subject, String chapterNumber) {
     final nameController = TextEditingController(
-      text:
-          _chapters[subject]?.firstWhere(
-            (chap) => chap['number'] == chapterNumber,
-          )['chapterName'],
+      text: _chapters[subject]?.firstWhere(
+        (chap) => chap['number'] == chapterNumber,
+      )['chapterName'],
     );
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Edit Name for Ch. $chapterNumber',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            content: TextField(
-              controller: nameController,
-              autofocus: true,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-              decoration: InputDecoration(
-                labelText: 'Chapter Name (Optional)',
-                labelStyle: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  setState(() {
-                    final chapterIndex = _chapters[subject]!.indexWhere(
-                      (chap) => chap['number'] == chapterNumber,
-                    );
-                    if (chapterIndex != -1) {
-                      _chapters[subject]![chapterIndex]['chapterName'] =
-                          nameController.text.trim();
-                    }
-                  });
-                  Navigator.pop(context);
-                },
-                child: const Text('Save'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Edit Name for Ch. $chapterNumber',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
           ),
+        ),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          decoration: InputDecoration(
+            labelText: 'Chapter Name (Optional)',
+            labelStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              setState(() {
+                final chapterIndex = _chapters[subject]!.indexWhere(
+                  (chap) => chap['number'] == chapterNumber,
+                );
+                if (chapterIndex != -1) {
+                  _chapters[subject]![chapterIndex]['chapterName'] =
+                      nameController.text.trim();
+                }
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -388,15 +381,13 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         deadline: _deadline!,
       );
 
-      final newTimetable =
-          apiResponse.map((dayData) {
-            final date = dayData['date'] as String;
-            final tasks =
-                (dayData['tasks'] as List<dynamic>).map((taskData) {
-                  return Map<String, dynamic>.from(taskData);
-                }).toList();
-            return {'date': date, 'tasks': tasks};
-          }).toList();
+      final newTimetable = apiResponse.map((dayData) {
+        final date = dayData['date'] as String;
+        final tasks = (dayData['tasks'] as List<dynamic>).map((taskData) {
+          return Map<String, dynamic>.from(taskData);
+        }).toList();
+        return {'date': date, 'tasks': tasks};
+      }).toList();
 
       setState(() {
         _generatedTimetable = newTimetable;
@@ -515,10 +506,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
       (d) => d['date'] == todayString,
       orElse: () => <String, Object>{'date': todayString, 'tasks': <dynamic>[]},
     );
-    final futureSchedule =
-        _generatedTimetable
-            .where((d) => DateTime.parse(d['date']).isAfter(today))
-            .toList();
+    final futureSchedule = _generatedTimetable
+        .where((d) => DateTime.parse(d['date']).isAfter(today))
+        .toList();
 
     return Scaffold(
       body: ListView(
@@ -559,11 +549,10 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                           DateFormat(
                             'EEEE, MMM d',
                           ).format(DateTime.parse(day['date'])),
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
                         ),
                       ),
 
@@ -623,6 +612,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           SnackBar(
             content: Text('You gained ${result['auraChange'] ?? 30} Aura!'),
             backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -663,12 +653,11 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         final content = item['content'] as Map<String, dynamic>;
         final subject = _subjects.firstWhere(
           (s) => s.name == content['subject'],
-          orElse:
-              () => Subject(
-                name: 'Unknown',
-                icon: Icons.help,
-                color: Theme.of(context).colorScheme.outline,
-              ),
+          orElse: () => Subject(
+            name: 'Unknown',
+            icon: Icons.help,
+            color: Theme.of(context).colorScheme.outline,
+          ),
         );
 
         final chapterNumber = content['chapterNumber'] as String?;
@@ -695,12 +684,11 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         final content = item['content'] as Map<String, dynamic>;
         final subject = _subjects.firstWhere(
           (s) => s.name == content['subject'],
-          orElse:
-              () => Subject(
-                name: 'Unknown',
-                icon: Icons.help,
-                color: Theme.of(context).colorScheme.outline,
-              ),
+          orElse: () => Subject(
+            name: 'Unknown',
+            icon: Icons.help,
+            color: Theme.of(context).colorScheme.outline,
+          ),
         );
 
         final chapterNumber = content['chapterNumber'] as String?;
@@ -727,6 +715,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: avatarColor,
@@ -734,9 +723,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
             icon,
             color:
                 ThemeData.estimateBrightnessForColor(avatarColor) ==
-                        Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
+                    Brightness.dark
+                ? Colors.white
+                : Colors.black,
           ),
         ),
         title: title,
@@ -751,12 +740,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                 value: (item['completed'] as bool?) ?? false,
                 onChanged:
                     isFutureTask || ((item['completed'] as bool?) ?? false)
-                        ? null
-                        : (bool? value) {
-                          if (value == true) {
-                            _toggleTaskCompletion(item, dateOfTask);
-                          }
-                        },
+                    ? null
+                    : (bool? value) {
+                        if (value == true) {
+                          _toggleTaskCompletion(item, dateOfTask);
+                        }
+                      },
               ),
           ],
         ),
@@ -771,38 +760,36 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           TextButton(
-            onPressed:
-                _currentPage == 0
-                    ? null
-                    : () => _pageController.previousPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.ease,
-                    ),
+            onPressed: _currentPage == 0
+                ? null
+                : () => _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.ease,
+                  ),
             child: const Text('Back'),
           ),
           FilledButton(
-            onPressed:
-                !_isNextEnabled() || (_currentPage == 5 && _isGenerating)
-                    ? null
-                    : () {
-                      if (_currentPage == 1) {
-                        FocusScope.of(context).unfocus();
-                      }
-                      if (_currentPage == 4) {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.ease,
-                        );
-                        _generateTimetable();
-                      } else if (_currentPage == 5) {
-                        _saveAndFinish();
-                      } else {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.ease,
-                        );
-                      }
-                    },
+            onPressed: !_isNextEnabled() || (_currentPage == 5 && _isGenerating)
+                ? null
+                : () {
+                    if (_currentPage == 1) {
+                      FocusScope.of(context).unfocus();
+                    }
+                    if (_currentPage == 4) {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.ease,
+                      );
+                      _generateTimetable();
+                    } else if (_currentPage == 5) {
+                      _saveAndFinish();
+                    } else {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.ease,
+                      );
+                    }
+                  },
             child: Text(_currentPage == 5 ? 'Finish' : 'Next'),
           ),
         ],
@@ -955,7 +942,8 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                 final subject = _subjects[index];
                 final chapterList = _chapters[subject.name] ?? [];
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  elevation: 0,
                   clipBehavior: Clip.antiAlias,
                   child: ExpansionTile(
                     leading: Icon(subject.icon),
@@ -965,22 +953,18 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                       ...chapterList.map(
                         (chap) => ListTile(
                           title: Text("Ch. ${chap['number']}"),
-                          subtitle:
-                              chap['chapterName']!.isNotEmpty
-                                  ? Text(chap['chapterName']!)
-                                  : const Text(
-                                    'Tap to add name',
-                                    style: TextStyle(
-                                      fontStyle: FontStyle.italic,
-                                      fontSize: 12,
-                                    ),
+                          subtitle: chap['chapterName']!.isNotEmpty
+                              ? Text(chap['chapterName']!)
+                              : const Text(
+                                  'Tap to add name',
+                                  style: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    fontSize: 12,
                                   ),
+                                ),
                           dense: true,
-                          onTap:
-                              () => _editChapterName(
-                                subject.name,
-                                chap['number']!,
-                              ),
+                          onTap: () =>
+                              _editChapterName(subject.name, chap['number']!),
                         ),
                       ),
                       Padding(
@@ -1104,150 +1088,142 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child:
-                _generatedTimetable.isEmpty
-                    ? const Center(
-                      child: Text(
-                        "Could not generate study plan. Check deadline and chapters.",
-                      ),
-                    )
-                    : ListView.builder(
-                      itemCount: _generatedTimetable.length,
-                      itemBuilder: (context, index) {
-                        final day = _generatedTimetable[index];
-                        final date = DateTime.parse(day['date'] as String);
-                        final tasks = day['tasks'] as List;
+            child: _generatedTimetable.isEmpty
+                ? const Center(
+                    child: Text(
+                      "Could not generate study plan. Check deadline and chapters.",
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _generatedTimetable.length,
+                    itemBuilder: (context, index) {
+                      final day = _generatedTimetable[index];
+                      final date = DateTime.parse(day['date'] as String);
+                      final tasks = day['tasks'] as List;
 
-                        return DragTarget<Map<String, dynamic>>(
-                          builder: (context, candidateData, rejectedData) {
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8.0,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16.0,
-                                      ),
-                                      child: Text(
-                                        DateFormat('EEEE, MMM d').format(date),
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium?.copyWith(
-                                          color:
-                                              Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface,
-                                        ),
-                                      ),
+                      return DragTarget<Map<String, dynamic>>(
+                        builder: (context, candidateData, rejectedData) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8.0,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0,
                                     ),
-
-                                    if (tasks.isEmpty)
-                                      _buildTaskTile(
-                                        {'type': 'break'},
-                                        day['date'] as String,
-                                        isPreview: true,
-                                      )
-                                    else
-                                      ...tasks.map((task) {
-                                        return Draggable<Map<String, dynamic>>(
-                                          data: {
-                                            'task': task,
-                                            'sourceDate': day['date'],
-                                          },
-
-                                          feedback: Material(
-                                            elevation: 4.0,
-                                            child: ConstrainedBox(
-                                              constraints: BoxConstraints(
-                                                maxWidth:
-                                                    MediaQuery.of(
-                                                      context,
-                                                    ).size.width *
-                                                    0.8,
-                                              ),
-                                              child: _buildTaskTile(
-                                                task,
-                                                day['date'],
-                                                isFeedback: true,
-                                                isPreview: true,
-                                              ),
-                                            ),
+                                    child: Text(
+                                      DateFormat('EEEE, MMM d').format(date),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                           ),
+                                    ),
+                                  ),
 
-                                          childWhenDragging: Opacity(
-                                            opacity: 0.5,
+                                  if (tasks.isEmpty)
+                                    _buildTaskTile(
+                                      {'type': 'break'},
+                                      day['date'] as String,
+                                      isPreview: true,
+                                    )
+                                  else
+                                    ...tasks.map((task) {
+                                      return Draggable<Map<String, dynamic>>(
+                                        data: {
+                                          'task': task,
+                                          'sourceDate': day['date'],
+                                        },
+
+                                        feedback: Material(
+                                          elevation: 4.0,
+                                          child: ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                              maxWidth:
+                                                  MediaQuery.of(
+                                                    context,
+                                                  ).size.width *
+                                                  0.8,
+                                            ),
                                             child: _buildTaskTile(
                                               task,
                                               day['date'],
+                                              isFeedback: true,
                                               isPreview: true,
                                             ),
                                           ),
+                                        ),
 
+                                        childWhenDragging: Opacity(
+                                          opacity: 0.5,
                                           child: _buildTaskTile(
                                             task,
                                             day['date'],
                                             isPreview: true,
                                           ),
-                                        );
-                                      }),
-                                  ],
-                                ),
+                                        ),
+
+                                        child: _buildTaskTile(
+                                          task,
+                                          day['date'],
+                                          isPreview: true,
+                                        ),
+                                      );
+                                    }),
+                                ],
                               ),
+                            ),
+                          );
+                        },
+
+                        onAccept: (data) {
+                          final taskToMove =
+                              data['task'] as Map<String, dynamic>;
+                          final sourceDateStr = data['sourceDate'] as String;
+                          final targetDateStr = day['date'] as String;
+
+                          if (sourceDateStr == targetDateStr) return;
+
+                          setState(() {
+                            final sourceIndex = _generatedTimetable.indexWhere(
+                              (d) => d['date'] == sourceDateStr,
                             );
-                          },
+                            final targetIndex = _generatedTimetable.indexWhere(
+                              (d) => d['date'] == targetDateStr,
+                            );
 
-                          onAccept: (data) {
-                            final taskToMove =
-                                data['task'] as Map<String, dynamic>;
-                            final sourceDateStr = data['sourceDate'] as String;
-                            final targetDateStr = day['date'] as String;
+                            if (sourceIndex == -1 || targetIndex == -1) return;
 
-                            if (sourceDateStr == targetDateStr) return;
+                            final sourceTasks = List<Map<String, dynamic>>.from(
+                              _generatedTimetable[sourceIndex]['tasks'] as List,
+                            );
+                            final targetTasks = List<Map<String, dynamic>>.from(
+                              _generatedTimetable[targetIndex]['tasks'] as List,
+                            );
 
-                            setState(() {
-                              final sourceIndex = _generatedTimetable
-                                  .indexWhere(
-                                    (d) => d['date'] == sourceDateStr,
-                                  );
-                              final targetIndex = _generatedTimetable
-                                  .indexWhere(
-                                    (d) => d['date'] == targetDateStr,
-                                  );
+                            sourceTasks.removeWhere(
+                              (t) => t['id'] == taskToMove['id'],
+                            );
 
-                              if (sourceIndex == -1 || targetIndex == -1)
-                                return;
+                            targetTasks.add(taskToMove);
 
-                              final sourceTasks =
-                                  List<Map<String, dynamic>>.from(
-                                    _generatedTimetable[sourceIndex]['tasks']
-                                        as List,
-                                  );
-                              final targetTasks =
-                                  List<Map<String, dynamic>>.from(
-                                    _generatedTimetable[targetIndex]['tasks']
-                                        as List,
-                                  );
-
-                              sourceTasks.removeWhere(
-                                (t) => t['id'] == taskToMove['id'],
-                              );
-
-                              targetTasks.add(taskToMove);
-
-                              _generatedTimetable[sourceIndex]['tasks'] =
-                                  sourceTasks;
-                              _generatedTimetable[targetIndex]['tasks'] =
-                                  targetTasks;
-                            });
-                          },
-                        );
-                      },
-                    ),
+                            _generatedTimetable[sourceIndex]['tasks'] =
+                                sourceTasks;
+                            _generatedTimetable[targetIndex]['tasks'] =
+                                targetTasks;
+                          });
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1301,10 +1277,9 @@ class SubjectIconPickerDialog extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color:
-                        initialIcon == icon
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.outline,
+                    color: initialIcon == icon
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.outline,
                     width: initialIcon == icon ? 2.0 : 1.0,
                   ),
                   borderRadius: BorderRadius.circular(8),
@@ -1395,26 +1370,20 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                         child: Container(
                           margin: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color:
-                                isSelected
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(
-                                      context,
-                                    ).colorScheme.surfaceContainerHighest,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(50),
                           ),
                           child: Center(
                             child: Text(
                               '$chapterNumber',
                               style: TextStyle(
-                                color:
-                                    isSelected
-                                        ? Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimary
-                                        : Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onSurface,
                                 fontWeight: isSelected ? FontWeight.bold : null,
                               ),
                             ),
@@ -1431,13 +1400,12 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back_ios),
-                  onPressed:
-                      _currentPage == 0
-                          ? null
-                          : () => _pageController.previousPage(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeIn,
-                          ),
+                  onPressed: _currentPage == 0
+                      ? null
+                      : () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeIn,
+                        ),
                 ),
                 Text(
                   'Page ${_currentPage + 1} of $_totalPages',
@@ -1447,13 +1415,12 @@ class _ChapterPickerDialogState extends State<ChapterPickerDialog> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.arrow_forward_ios),
-                  onPressed:
-                      _currentPage >= _totalPages - 1
-                          ? null
-                          : () => _pageController.nextPage(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeIn,
-                          ),
+                  onPressed: _currentPage >= _totalPages - 1
+                      ? null
+                      : () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeIn,
+                        ),
                 ),
               ],
             ),
