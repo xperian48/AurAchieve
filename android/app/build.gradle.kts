@@ -17,22 +17,21 @@ android {
     }
 
     kotlin {
-        // FIX: Replaced the deprecated `kotlinOptions` block with the modern `jvmToolchain`.
         jvmToolchain(11)
     }
 
     sourceSets {
-        main {
-            java {
+        // FIX: Corrected the syntax for configuring the 'main' source set.
+        getByName("main") {
+            java.srcDirs(
                 // Include the generated Flutter files.
-                srcDir "$flutterRoot/packages/flutter_tools/templates/app/android/app/src/main/java"
-            }
+                "$flutterRoot/packages/flutter_tools/templates/app/android/app/src/main/java"
+            )
         }
     }
 
     defaultConfig {
         applicationId = "com.nicesapien.auraascend"
-        // FIX: Changed minSdk to be an integer instead of a string.
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
