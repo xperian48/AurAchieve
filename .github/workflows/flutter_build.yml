@@ -50,7 +50,7 @@ jobs:
   #----------------------------------------------------
   # Build iOS (Requires macOS runner)
   #----------------------------------------------------
-build_ios:
+ build_ios:
      name: Build Flutter (iOS)
      runs-on: macos-latest
      steps:
