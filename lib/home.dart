@@ -1337,7 +1337,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         title: Text(titleText),
-        subtitle: subtitleText != null ? Text(subtitleText) : null,
+        subtitle: Text(subtitleText),
       ),
     );
   }

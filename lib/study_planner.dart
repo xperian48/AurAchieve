@@ -1185,7 +1185,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                         },
 
                         onAcceptWithDetails: (details) {
-                          final payload = details.data as Map<String, dynamic>;
+                          final payload = details.data;
                           final taskToMove =
                               payload['task'] as Map<String, dynamic>;
                           final sourceDateStr = payload['sourceDate'] as String;

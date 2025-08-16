@@ -1,8 +1,6 @@
 import 'package:auraascend/main.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:appwrite/appwrite.dart';
-import 'theme.dart';
 import 'habit_setup.dart';
 
 class HabitsPage extends StatelessWidget {

@@ -55,7 +55,7 @@ class _HabitSetupState extends State<HabitSetup> {
     'a healthy person',
   ];
 
-  bool _suggestionsExpanded = true;
+  final bool _suggestionsExpanded = true;
   bool _introForward = true;
 
   @override
@@ -513,7 +513,7 @@ class _HabitSetupState extends State<HabitSetup> {
                   );
                 },
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
