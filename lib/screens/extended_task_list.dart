@@ -204,8 +204,9 @@ class _AllTasksScreenState extends State<AllTasksScreen>
 
                   return AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
-                    opacity:
-                        (expandedTaskId != null && !isExpanded) ? 0.3 : 1.0,
+                    opacity: (expandedTaskId != null && !isExpanded)
+                        ? 0.3
+                        : 1.0,
                     child: Hero(
                       tag: 'task_hero_${task.id}',
                       child: Material(
@@ -336,8 +337,8 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     return GestureDetector(
       onTap: () {},
       child: Transform(
-        transform:
-            Matrix4.identity()..scale(1.0 + _expandAnimation.value * 0.05),
+        transform: Matrix4.identity()
+          ..scale(1.0 + _expandAnimation.value * 0.05),
         alignment: Alignment.center,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 350),
@@ -361,24 +362,22 @@ class _AllTasksScreenState extends State<AllTasksScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
-                      onTap:
-                          isCompleting
-                              ? null
-                              : () => _completeTask(task, originalIndex),
+                      onTap: isCompleting
+                          ? null
+                          : () => _completeTask(task, originalIndex),
                       child: Row(
                         children: [
                           Container(
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color:
-                                  isCompleting
-                                      ? Theme.of(
-                                        context,
-                                      ).colorScheme.primaryContainer
-                                      : Theme.of(
-                                        context,
-                                      ).colorScheme.surfaceContainerLow,
+                              color: isCompleting
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerLow,
                               shape: BoxShape.circle,
                             ),
                             child: Stack(
@@ -398,23 +397,20 @@ class _AllTasksScreenState extends State<AllTasksScreen>
                                     angle: _expandAnimation.value * math.pi * 2,
                                     child: Opacity(
                                       opacity: _expandAnimation.value,
-                                      child:
-                                          isCompleting
-                                              ? const Padding(
-                                                padding: EdgeInsets.all(8.0),
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2.5,
-                                                    ),
-                                              )
-                                              : Icon(
-                                                Icons.check_circle_outline,
-                                                color:
-                                                    Theme.of(
-                                                      context,
-                                                    ).colorScheme.primary,
-                                                size: 24,
+                                      child: isCompleting
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(8.0),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
                                               ),
+                                            )
+                                          : Icon(
+                                              Icons.check_circle_outline,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              size: 24,
+                                            ),
                                     ),
                                   ),
                                 ),
@@ -649,37 +645,34 @@ class _AllTasksScreenState extends State<AllTasksScreen>
 
             final confirm = await showDialog<bool>(
               context: context,
-              builder:
-                  (context) => AlertDialog(
-                    backgroundColor: bgColor,
-                    title: Text(
-                      "Mark Task as Bad",
-                      style: TextStyle(color: textColor),
+              builder: (context) => AlertDialog(
+                backgroundColor: bgColor,
+                title: Text(
+                  "Mark Task as Bad",
+                  style: TextStyle(color: textColor),
+                ),
+                content: Text(
+                  "If this is a bad task, you can mark it as one and lose aura whenever you do it.",
+                  style: TextStyle(color: textColor),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
                     ),
-                    content: Text(
-                      "If this is a bad task, you can mark it as one and lose aura whenever you do it.",
-                      style: TextStyle(color: textColor),
-                    ),
-                    actions: [
-                      TextButton(
-                        child: const Text("Cancel"),
-                        onPressed: () => Navigator.of(context).pop(false),
-                        style: TextButton.styleFrom(
-                          foregroundColor:
-                              Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      FilledButton(
-                        child: const Text("Mark as Bad"),
-                        onPressed: () => Navigator.of(context).pop(true),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onError,
-                        ),
-                      ),
-                    ],
+                    child: const Text("Cancel"),
                   ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
+                    child: const Text("Mark as Bad"),
+                  ),
+                ],
+              ),
             );
             if (confirm == true) {
               try {
@@ -717,10 +710,9 @@ class _AllTasksScreenState extends State<AllTasksScreen>
     int index,
   ) {
     const int maxTitleChars = 30;
-    final String displayTitle =
-        task.name.length > maxTitleChars && !isExpanded
-            ? '${task.name.substring(0, maxTitleChars)}...'
-            : task.name;
+    final String displayTitle = task.name.length > maxTitleChars && !isExpanded
+        ? '${task.name.substring(0, maxTitleChars)}...'
+        : task.name;
 
     return GestureDetector(
       onTap: () {
@@ -730,12 +722,11 @@ class _AllTasksScreenState extends State<AllTasksScreen>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder:
-                  (_) => TimerPage(
-                    task: task,
-                    apiService: widget.apiService,
-                    onTaskCompleted: widget.onTaskCompleted,
-                  ),
+              builder: (_) => TimerPage(
+                task: task,
+                apiService: widget.apiService,
+                onTaskCompleted: widget.onTaskCompleted,
+              ),
             ),
           );
         } else if (isExpanded) {

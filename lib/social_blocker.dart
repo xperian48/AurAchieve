@@ -11,7 +11,12 @@ import '../widgets/dynamic_color_svg.dart';
 
 class SocialMediaBlockerScreen extends StatefulWidget {
   final ApiService apiService;
-  const SocialMediaBlockerScreen({super.key, required this.apiService});
+  final VoidCallback onChallengeCompleted;
+  const SocialMediaBlockerScreen({
+    super.key,
+    required this.apiService,
+    required this.onChallengeCompleted,
+  });
 
   @override
   State<SocialMediaBlockerScreen> createState() =>
@@ -136,7 +141,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
 
     try {
       final result = await widget.apiService.completeSocialBlocker();
-      final auraGained = result['aura'] ?? 0;
+      final auraGained = result['aura'] ?? 15;
       final finishedPassword = result['socialPassword'] as String?;
 
       if (finishedPassword == null) {
@@ -148,6 +153,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
       await prefs.setString('sm_blocker_finished_password', finishedPassword);
 
       if (mounted) {
+        widget.onChallengeCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Congratulations! You have gained $auraGained aura.'),
@@ -368,7 +374,7 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: 260,
+              height: 240,
               child: DynamicColorSvg(
                 assetName: asset,
                 color: Theme.of(context).colorScheme.primary,
@@ -579,20 +585,20 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
 
   Widget _buildNavigationControls() {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.only(right: 12.0, left: 12, bottom: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _currentPage > 0
               ? TextButton(
-                onPressed: () {
-                  _pageController.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.ease,
-                  );
-                },
-                child: const Text('Back'),
-              )
+                  onPressed: () {
+                    _pageController.previousPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.ease,
+                    );
+                  },
+                  child: const Text('Back'),
+                )
               : const SizedBox(width: 60),
           FilledButton(
             onPressed: () {
@@ -638,8 +644,9 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
     if (!_isTimeUp && _setupDate != null && _timeoutDate != null) {
       final totalDuration = _timeoutDate!.difference(_setupDate!).inSeconds;
       if (totalDuration > 0) {
-        final elapsedDuration =
-            DateTime.now().difference(_setupDate!).inSeconds;
+        final elapsedDuration = DateTime.now()
+            .difference(_setupDate!)
+            .inSeconds;
         progress = (elapsedDuration / totalDuration).clamp(0.0, 1.0);
       }
 
@@ -657,10 +664,9 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
-        child:
-            _isTimeUp
-                ? _buildCongratulationsView()
-                : _buildInProgressView(progress, timeRemaining),
+        child: _isTimeUp
+            ? _buildCongratulationsView()
+            : _buildInProgressView(progress, timeRemaining),
       ),
     );
   }
@@ -678,8 +684,9 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
               CircularProgressIndicator(
                 value: progress,
                 strokeWidth: 12,
-                backgroundColor:
-                    Theme.of(context).colorScheme.surfaceContainerHighest,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
               ),
               Center(
                 child: Text(
@@ -817,21 +824,18 @@ class _SocialMediaBlockerScreenState extends State<SocialMediaBlockerScreen> {
                   ElevatedButton.icon(
                     icon: const Icon(Icons.copy),
                     label: const Text('Copy Password'),
-                    onPressed:
-                        _finishedPassword == null
-                            ? null
-                            : () {
-                              Clipboard.setData(
-                                ClipboardData(text: _finishedPassword!),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Password copied!'),
-                                ),
-                              );
-                            },
+                    onPressed: _finishedPassword == null
+                        ? null
+                        : () {
+                            Clipboard.setData(
+                              ClipboardData(text: _finishedPassword!),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Password copied!')),
+                            );
+                          },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 6),
                   FilledButton.icon(
                     icon: const Icon(Icons.refresh),
                     label: const Text('Finish & Start New'),

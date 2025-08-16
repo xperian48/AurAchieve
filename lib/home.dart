@@ -94,8 +94,8 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   bool _isTimetableSetupInProgress = true;
 
-  bool _showAllTasks = false;
-  bool _showAllStudyTasks = false;
+  final bool _showAllTasks = false;
+  final bool _showAllStudyTasks = false;
   List<Map<String, dynamic>> _todaysStudyPlan = [];
   List<Subject> _subjects = [];
   bool _isStudyPlanSetupComplete = false;
@@ -664,7 +664,7 @@ class _HomePageState extends State<HomePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${apiCallResult?['message'] ?? 'Task status updated.'} Aura change: ${apiCallResult?['auraChange'] ?? 0}',
+              '${apiCallResult['message'] ?? 'Task status updated.'} Aura change: ${apiCallResult['auraChange'] ?? 0}',
             ),
             backgroundColor: Theme.of(context).colorScheme.primary,
           ),
@@ -849,10 +849,13 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> _widgetOptions = <Widget>[
+    final List<Widget> widgetOptions = <Widget>[
       _buildDashboardView(),
       HabitsPage(),
-      SocialMediaBlockerScreen(apiService: _apiService),
+      SocialMediaBlockerScreen(
+        apiService: _apiService,
+        onChallengeCompleted: _fetchDataFromServer,
+      ),
       StudyPlannerScreen(
         onSetupStateChanged: _updateTimetableSetupState,
         apiService: _apiService,
@@ -973,7 +976,7 @@ class _HomePageState extends State<HomePage> {
                 Expanded(
                   child: IndexedStack(
                     index: _selectedIndex,
-                    children: _widgetOptions,
+                    children: widgetOptions,
                   ),
                 ),
               ],
@@ -1006,14 +1009,6 @@ class _HomePageState extends State<HomePage> {
             label: 'Planner',
           ),
         ],
-        //   currentIndex: _selectedIndex,
-        // selectedItemColor: Theme.of(context).colorScheme.primary,
-        //unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        /* onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },*/
       ),
       floatingActionButton: _selectedIndex == 0
           ? FloatingActionButton.extended(
@@ -1072,7 +1067,7 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            '"Oh yes, the past can hurt. But, you can either run from it or learn from it."',
+                            'Make them realise that they lost a diamond while playing with worthless stones',
                             style: GoogleFonts.gabarito(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
@@ -1087,7 +1082,7 @@ class _HomePageState extends State<HomePage> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: Text(
-                              "- The Lion King",
+                              "- Captain Underpants",
                               style: GoogleFonts.ebGaramond(
                                 fontSize: 14,
                                 color: Theme.of(

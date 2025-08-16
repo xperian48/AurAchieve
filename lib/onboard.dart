@@ -33,7 +33,7 @@ class OnBoard extends StatelessWidget {
                 SizedBox(height: 2),
                 Text(
                   'Prepare to live a better life.',
-                  style: GoogleFonts.roboto(fontSize: 18),
+                  style: GoogleFonts.ebGaramond(fontSize: 18),
                 ),
                 SizedBox(height: 20),
                 ElevatedButton(

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:appwrite/appwrite.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -255,7 +254,6 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
-      // Handle cases where the server returns 200 but with an empty body
       if (response.body.isEmpty ||
           response.body == "null" ||
           response.body == "{}") {
@@ -263,16 +261,12 @@ class ApiService {
       }
       return jsonDecode(response.body);
     } else if (response.statusCode == 404) {
-      // Handle explicit "Not Found"
       return null;
     } else {
-      // For other errors (like 500), check if the body implies "not found"
-      // before throwing an exception, making the client more resilient.
       final body = response.body.toLowerCase();
       if (body.contains('not found') || body.contains('no study plan')) {
         return null;
       }
-      // Otherwise, it's a real error we should report.
       throw Exception('Failed to get study plan: ${response.body}');
     }
   }
@@ -291,7 +285,7 @@ class ApiService {
     };
 
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/timetable'),
+      Uri.parse('$_baseUrl/api/study-plan/generate'),
       headers: headers,
       body: jsonEncode(body),
     );

@@ -1,7 +1,7 @@
 name: auraascend
 description: "Fix your damn life with AurAchieve."
 publish_to: 'none'
-version: 0.1.4
+version: 0.1.5
 
 environment:
   sdk: ^3.8.1
@@ -17,7 +17,6 @@ dependencies:
   dynamic_color: ^1.6.6
   http: ^1.4.0
   flutter_secure_storage: ^9.2.4
-  app_usage: ^4.0.1
   flutter_local_notifications: ^19.2.1
   firebase_core: ^4.0.0
   firebase_messaging: ^16.0.0

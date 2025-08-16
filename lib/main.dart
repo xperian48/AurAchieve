@@ -79,11 +79,13 @@ class MyApp extends StatelessWidget {
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: SystemUiOverlayStyle(
                 systemNavigationBarColor: Colors.transparent,
-                systemNavigationBarIconBrightness:
-                    isDarkMode ? Brightness.light : Brightness.dark,
+                systemNavigationBarIconBrightness: isDarkMode
+                    ? Brightness.light
+                    : Brightness.dark,
                 statusBarColor: Colors.transparent,
-                statusBarIconBrightness:
-                    isDarkMode ? Brightness.light : Brightness.dark,
+                statusBarIconBrightness: isDarkMode
+                    ? Brightness.light
+                    : Brightness.dark,
               ),
               child: child!,
             );
@@ -247,7 +249,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
   }
 
   void _autoPlayFeatures() async {
-    const int featureCount = 3;
+    const int featureCount = 6;
     while (mounted && !stopCarousel) {
       await Future.delayed(const Duration(seconds: 3));
       if (!mounted || stopCarousel) break;
@@ -363,7 +365,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
             isSignup
                 ? 'Can\'t wait to see a better you.'
                 : 'Glad to see you again!',
-            style: GoogleFonts.roboto(
+            style: GoogleFonts.ebGaramond(
               fontSize: 18,
               color: Theme.of(context).colorScheme.secondary,
             ),
@@ -383,13 +385,29 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
       },
       {
         'svg': 'assets/img/feature1.svg',
-        'title': 'Aura Points',
+        'title': 'Aura',
         'desc': 'Earn and track your Aura as you complete tasks.',
       },
       {
         'svg': 'assets/img/feature2.svg',
         'title': 'AI Powered',
-        'desc': 'Let AI verify your progress and help you grow.',
+        'desc':
+            'With AI helping you with every step of the way, you\'ll never feel lost.',
+      },
+      {
+        'svg': 'assets/img/habit.svg',
+        'title': 'Habits',
+        'desc': 'Build good habits and break bad ones.',
+      },
+      {
+        'svg': 'assets/img/social.svg',
+        'title': 'Social Media Blocker',
+        'desc': 'Block your social media apps and touch some grass.',
+      },
+      {
+        'svg': 'assets/img/study.svg',
+        'title': 'Study Planner',
+        'desc': 'Plan your study sessions with AI and stay on track.',
       },
     ];
 
@@ -400,52 +418,51 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
             controller: _featureController,
             itemCount: features.length,
             onPageChanged: (i) => setState(() => _featurePage = i),
-            itemBuilder:
-                (context, i) => Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32.0,
-                          vertical: 16.0,
-                        ),
-                        child: DynamicColorSvg(
-                          assetName: features[i]['svg']!,
-                          color: Theme.of(context).colorScheme.primary,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+            itemBuilder: (context, i) => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32.0,
+                      vertical: 16.0,
                     ),
-                    SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            features[i]['title']!,
-                            style: GoogleFonts.ebGaramond(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            features[i]['desc']!,
-                            style: GoogleFonts.roboto(
-                              fontSize: 20,
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
+                    child: DynamicColorSvg(
+                      assetName: features[i]['svg']!,
+                      color: Theme.of(context).colorScheme.primary,
+                      fit: BoxFit.contain,
                     ),
-                    SizedBox(height: 48),
-                  ],
+                  ),
                 ),
+                SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        features[i]['title']!,
+                        style: GoogleFonts.ebGaramond(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        features[i]['desc']!,
+                        style: GoogleFonts.gabarito(
+                          fontSize: 20,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 48),
+              ],
+            ),
           ),
           Positioned(
             bottom: 24,
@@ -460,12 +477,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                   width: _featurePage == idx ? 18 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color:
-                        _featurePage == idx
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(
-                              context,
-                            ).colorScheme.primary.withOpacity(0.3),
+                    color: _featurePage == idx
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(
+                            context,
+                          ).colorScheme.primary.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -532,10 +548,8 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                 suffixIcon: IconButton(
                   icon: Icon(
                     _isPasswordVisible
-                        ? Icons
-                            .visibility_rounded // Show "eye" when visible
-                        : Icons
-                            .visibility_off_rounded, // Show "eye-off" when hidden
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded,
                   ),
                   onPressed: () {
                     setState(() {
@@ -556,17 +570,13 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
             FilledButton.icon(
               icon: Icon(Icons.person_add_alt_1_rounded),
               onPressed: isBusy ? null : register,
-              label:
-                  isBusy
-                      ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : Text(
-                        'Sign Up',
-                        style: GoogleFonts.gabarito(fontSize: 18),
-                      ),
+              label: isBusy
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text('Sign Up', style: GoogleFonts.gabarito(fontSize: 18)),
               style: FilledButton.styleFrom(
                 minimumSize: Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
@@ -623,10 +633,8 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                 suffixIcon: IconButton(
                   icon: Icon(
                     _isPasswordVisible
-                        ? Icons
-                            .visibility_rounded // Show "eye" when visible
-                        : Icons
-                            .visibility_off_rounded, // Show "eye-off" when hidden
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded,
                   ),
                   onPressed: () {
                     setState(() {
@@ -642,17 +650,13 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
             FilledButton.icon(
               icon: Icon(Icons.login_rounded),
               onPressed: isBusy ? null : login,
-              label:
-                  isBusy
-                      ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : Text(
-                        'Login',
-                        style: GoogleFonts.gabarito(fontSize: 18),
-                      ),
+              label: isBusy
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text('Login', style: GoogleFonts.gabarito(fontSize: 18)),
               style: FilledButton.styleFrom(
                 minimumSize: Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
@@ -686,12 +690,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final showForm = showSignup || showLogin;
-            final formWidget =
-                showSignup
-                    ? _signupForm()
-                    : showLogin
-                    ? _loginForm()
-                    : null;
+            final formWidget = showSignup
+                ? _signupForm()
+                : showLogin
+                ? _loginForm()
+                : null;
 
             Widget currentScreen;
             if (!showForm) {
@@ -709,11 +712,10 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                       children: [
                         FilledButton.icon(
                           icon: Icon(Icons.rocket_launch_rounded),
-                          onPressed:
-                              () => setState(() {
-                                showSignup = true;
-                                stopCarousel = true;
-                              }),
+                          onPressed: () => setState(() {
+                            showSignup = true;
+                            stopCarousel = true;
+                          }),
                           label: Text(
                             'Get Started',
                             style: GoogleFonts.gabarito(fontSize: 18),
@@ -728,11 +730,10 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                         SizedBox(height: 16),
                         OutlinedButton.icon(
                           icon: Icon(Icons.login_rounded),
-                          onPressed:
-                              () => setState(() {
-                                showLogin = true;
-                                stopCarousel = true;
-                              }),
+                          onPressed: () => setState(() {
+                            showLogin = true;
+                            stopCarousel = true;
+                          }),
                           label: Text(
                             'Login',
                             style: GoogleFonts.gabarito(fontSize: 18),
@@ -753,10 +754,9 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
               currentScreen = SingleChildScrollView(
                 key: ValueKey('form'),
                 padding: EdgeInsets.only(
-                  bottom:
-                      MediaQuery.of(context).viewInsets.bottom > 0
-                          ? MediaQuery.of(context).viewInsets.bottom + 16
-                          : 16.0,
+                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                      ? MediaQuery.of(context).viewInsets.bottom + 16
+                      : 16.0,
                   top: 16.0,
                 ),
                 child: Column(

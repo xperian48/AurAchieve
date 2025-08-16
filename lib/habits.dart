@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:appwrite/appwrite.dart';
 import 'theme.dart';
+import 'habit_setup.dart';
 
 class HabitsPage extends StatelessWidget {
+  const HabitsPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,11 +44,11 @@ class HabitsPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'add_habit_fab',
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("my dih hard bro"),
-              behavior: SnackBarBehavior.floating,
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HabitSetup(userName: "YourUserNameHere"),
             ),
           );
         },

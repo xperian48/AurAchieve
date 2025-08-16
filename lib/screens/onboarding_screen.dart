@@ -135,7 +135,7 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
           SizedBox(height: 8),
           Text(
             isSignup ? 'Let\'s get you started.' : 'Continue your journey.',
-            style: GoogleFonts.roboto(
+            style: GoogleFonts.gabarito(
               fontSize: 18,
               color: Theme.of(context).colorScheme.secondary,
             ),
@@ -171,52 +171,51 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
             controller: _featureController,
             itemCount: features.length,
             onPageChanged: (i) => setState(() => _featurePage = i),
-            itemBuilder:
-                (context, i) => Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32.0,
-                          vertical: 16.0,
-                        ),
-                        child: DynamicColorSvg(
-                          assetName: features[i]['svg']!,
-                          color: Theme.of(context).colorScheme.primary,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+            itemBuilder: (context, i) => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32.0,
+                      vertical: 16.0,
                     ),
-                    SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            features[i]['title']!,
-                            style: GoogleFonts.ebGaramond(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            features[i]['desc']!,
-                            style: GoogleFonts.roboto(
-                              fontSize: 20,
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
+                    child: DynamicColorSvg(
+                      assetName: features[i]['svg']!,
+                      color: Theme.of(context).colorScheme.primary,
+                      fit: BoxFit.contain,
                     ),
-                    SizedBox(height: 48),
-                  ],
+                  ),
                 ),
+                SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        features[i]['title']!,
+                        style: GoogleFonts.ebGaramond(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        features[i]['desc']!,
+                        style: GoogleFonts.gabarito(
+                          fontSize: 20,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 48),
+              ],
+            ),
           ),
           Positioned(
             bottom: 24,
@@ -231,12 +230,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                   width: _featurePage == idx ? 18 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color:
-                        _featurePage == idx
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(
-                              context,
-                            ).colorScheme.primary.withOpacity(0.3),
+                    color: _featurePage == idx
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(
+                            context,
+                          ).colorScheme.primary.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -300,27 +298,26 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
           isBusy
               ? CircularProgressIndicator()
               : FilledButton.icon(
-                icon: Icon(Icons.person_add_alt_1_rounded),
-                onPressed: register,
-                label: Text(
-                  'Sign Up',
-                  style: GoogleFonts.gabarito(fontSize: 18),
-                ),
-                style: FilledButton.styleFrom(
-                  minimumSize: Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  icon: Icon(Icons.person_add_alt_1_rounded),
+                  onPressed: register,
+                  label: Text(
+                    'Sign Up',
+                    style: GoogleFonts.gabarito(fontSize: 18),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
-              ),
           SizedBox(height: 16),
           TextButton(
-            onPressed:
-                () => setState(() {
-                  showSignup = false;
-                  showLogin = true;
-                  error = '';
-                }),
+            onPressed: () => setState(() {
+              showSignup = false;
+              showLogin = true;
+              error = '';
+            }),
             child: Text('Already have an account? Login'),
           ),
         ],
@@ -369,24 +366,26 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
           isBusy
               ? CircularProgressIndicator()
               : FilledButton.icon(
-                icon: Icon(Icons.login_rounded),
-                onPressed: login,
-                label: Text('Login', style: GoogleFonts.gabarito(fontSize: 18)),
-                style: FilledButton.styleFrom(
-                  minimumSize: Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  icon: Icon(Icons.login_rounded),
+                  onPressed: login,
+                  label: Text(
+                    'Login',
+                    style: GoogleFonts.gabarito(fontSize: 18),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
-              ),
           SizedBox(height: 16),
           TextButton(
-            onPressed:
-                () => setState(() {
-                  showLogin = false;
-                  showSignup = true;
-                  error = '';
-                }),
+            onPressed: () => setState(() {
+              showLogin = false;
+              showSignup = true;
+              error = '';
+            }),
             child: Text('Don\'t have an account? Sign Up'),
           ),
         ],
@@ -403,12 +402,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final showForm = showSignup || showLogin;
-            final formWidget =
-                showSignup
-                    ? _signupForm()
-                    : showLogin
-                    ? _loginForm()
-                    : null;
+            final formWidget = showSignup
+                ? _signupForm()
+                : showLogin
+                ? _loginForm()
+                : null;
 
             Widget currentScreen;
             if (!showForm) {
@@ -426,12 +424,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                       children: [
                         FilledButton.icon(
                           icon: Icon(Icons.rocket_launch_rounded),
-                          onPressed:
-                              () => setState(() {
-                                showSignup = true;
-                                stopCarousel = true;
-                                error = '';
-                              }),
+                          onPressed: () => setState(() {
+                            showSignup = true;
+                            stopCarousel = true;
+                            error = '';
+                          }),
                           label: Text(
                             'Get Started',
                             style: GoogleFonts.gabarito(fontSize: 18),
@@ -446,12 +443,11 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
                         SizedBox(height: 16),
                         OutlinedButton.icon(
                           icon: Icon(Icons.login_rounded),
-                          onPressed:
-                              () => setState(() {
-                                showLogin = true;
-                                stopCarousel = true;
-                                error = '';
-                              }),
+                          onPressed: () => setState(() {
+                            showLogin = true;
+                            stopCarousel = true;
+                            error = '';
+                          }),
                           label: Text(
                             'Login',
                             style: GoogleFonts.gabarito(fontSize: 18),
@@ -472,10 +468,9 @@ class _AuraOnboardingState extends State<AuraOnboarding> {
               currentScreen = SingleChildScrollView(
                 key: ValueKey('form'),
                 padding: EdgeInsets.only(
-                  bottom:
-                      MediaQuery.of(context).viewInsets.bottom > 0
-                          ? MediaQuery.of(context).viewInsets.bottom + 16
-                          : 16.0,
+                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                      ? MediaQuery.of(context).viewInsets.bottom + 16
+                      : 16.0,
                   top: 16.0,
                 ),
                 child: Column(
