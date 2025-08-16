@@ -25,24 +25,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true
+          # cache: true
 
+      # Use 'pub upgrade' instead of 'pub get' to fetch latest plugin versions
+      # This is needed to resolve v1/v2 Android embedding issues (e.g., path_provider_android)
       - name: Upgrade Flutter dependencies
-        run: flutter pub upgrade
+        run: flutter pub upgrade # Changed from 'flutter pub get'
+
+      # NOTE: Analyze and test steps removed.
 
       - name: Build Flutter APK (Debug)
         run: flutter build apk --debug
@@ -57,50 +51,58 @@ jobs:
   # Build iOS (Requires macOS runner)
   #----------------------------------------------------
   build_ios:
-    name: Build Flutter (iOS)
-    runs-on: macos-14
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+   name: Build Flutter (iOS)
+   runs-on: macos-14
+   steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Cache Pods dependencies
-        uses: actions/cache@v4
-        with:
-          path: ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
+    - name: Get Flutter dependencies
+      run: flutter pub get
 
-      - name: Get Flutter dependencies
-        run: flutter pub get
+    - name: Build Flutter iOS (Release - No Code Signing)
+      # This command places the .app bundle at build/ios/iphoneos/Runner.app
+      run: flutter build ios --release --no-codesign
 
-      - name: Build Flutter iOS (Release - No Code Signing)
-        run: flutter build ios --release --no-codesign
+    - name: Package .app into .ipa (Unsigned)
+      run: |
+        # Define paths for clarity
+        APP_BUNDLE_SOURCE="build/ios/iphoneos/Runner.app"
+        PAYLOAD_DIR="Payload"
+        OUTPUT_IPA_NAME="AuraAscend.ipa"
+        # Create the Payload directory. It will be created at the repository root.
+        mkdir -p "$PAYLOAD_DIR"
+        # Copy the Runner.app bundle into the Payload directory.
+        # This results in ./Payload/Runner.app
+        cp -r "$APP_BUNDLE_SOURCE" "$PAYLOAD_DIR/"
+        # List contents for debugging (optional, but good for verification)
+        echo "Contents of Payload directory:"
+        ls -R "$PAYLOAD_DIR"
+        # Create the .ipa file by zipping the Payload directory.
+        # The crucial part: running `zip -r <output.ipa> <directory_to_zip>/`
+        # ensures that <directory_to_zip> becomes the root of the archive.
+        # So, zipping "Payload/" from the current working directory
+        # means "Payload/" is at the root of the .ipa.
+        zip -r "$OUTPUT_IPA_NAME" "$PAYLOAD_DIR"
+        # Optional: Clean up the temporary Payload directory
+        rm -rf "$PAYLOAD_DIR"
+        echo "Generated IPA path: $(pwd)/$OUTPUT_IPA_NAME"
+        echo "Verifying IPA contents (unzipping in temp dir):"
+        mkdir -p temp_ipa_check
+        unzip -l "$OUTPUT_IPA_NAME" -d temp_ipa_check
+        echo "Contents of temp_ipa_check:"
+        ls -R temp_ipa_check
+        rm -rf temp_ipa_check
+      # Ensure this step always runs, even if previous ones fail (not needed here but good practice)
+      # if: success() || failure()
 
-      - name: Package .app into .ipa (Unsigned)
-        run: |
-          APP_BUNDLE_SOURCE="build/ios/iphoneos/Runner.app"
-          PAYLOAD_DIR="Payload"
-          OUTPUT_IPA_NAME="AurAchieve.ipa"
-          mkdir -p "$PAYLOAD_DIR"
-          cp -r "$APP_BUNDLE_SOURCE" "$PAYLOAD_DIR/"
-          zip -r "$OUTPUT_IPA_NAME" "$PAYLOAD_DIR"
-          rm -rf "$PAYLOAD_DIR"
-
-      - name: Upload Unsigned iOS IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-ios-ipa
-          path: AurAchieve.ipa
-        
-      - name: Upload Podfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: Podfile
-          path: ios/Podfile
+    - name: Upload Unsigned iOS IPA Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: unsigned-ios-ipa
+        path: AuraAscend.ipa # This path points to the IPA created in the previous step
