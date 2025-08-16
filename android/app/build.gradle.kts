@@ -12,20 +12,28 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+    kotlin {
+        // FIX: Replaced the deprecated `kotlinOptions` block with the modern `jvmToolchain`.
+        jvmToolchain(11)
+    }
+
+    sourceSets {
+        main {
+            java {
+                // Include the generated Flutter files.
+                srcDir "$flutterRoot/packages/flutter_tools/templates/app/android/app/src/main/java"
+            }
+        }
     }
 
     defaultConfig {
-        applicationId = "com.nicesapien.aura"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = "23"
+        applicationId = "com.nicesapien.auraascend"
+        // FIX: Changed minSdk to be an integer instead of a string.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
