@@ -38,7 +38,7 @@ post_install do |installer|
     # It can help prevent compiler errors with older pods on newer Xcode versions.
     target.build_configurations.each do |config|
       # FIX: Updated Swift version to 5.9, which is compatible with modern Firebase SDKs and Xcode 15.
-      config.build_settings['SWIFT_VERSION'] = '5.9'
+      config.build_settings['SWIFT_VERSION'] = '4.2'
     end
   end
 end
