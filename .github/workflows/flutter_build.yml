@@ -62,8 +62,12 @@ jobs:
       with:
         channel: 'stable'
 
-    - name: Get Flutter dependencies
-      run: flutter pub get
+    - name: Install dependencies and pods
+      run: |
+        flutter clean
+        flutter pub get
+        cd ios
+        pod install --repo-update
 
     - name: Build Flutter iOS (Release - No Code Signing)
       # This command places the .app bundle at build/ios/iphoneos/Runner.app
