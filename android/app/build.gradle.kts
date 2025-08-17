@@ -23,7 +23,7 @@ android {
     defaultConfig {
         applicationId = "com.nicesapien.auraascend"
         // FIX: Changed to a correct assignment.
-        minSdkVersion = flutter.minSdkVersion
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
