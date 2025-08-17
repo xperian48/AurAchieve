@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'dart:math';
 
 import 'widgets/dynamic_color_svg.dart';
 import 'api_service.dart';
