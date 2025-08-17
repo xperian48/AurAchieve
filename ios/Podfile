@@ -16,7 +16,6 @@ def flutter_root
   unless File.exist?(generated_xcode_build_settings_path)
     raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure \"flutter pub get\" is executed first"
   end
-
   File.read(generated_xcode_build_settings_path).strip.match(/FLUTTER_ROOT=(.*)/)[1]
 end
 
@@ -34,11 +33,5 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-    # This script forces all pods to use a specific Swift version.
-    # It can help prevent compiler errors with older pods on newer Xcode versions.
-    target.build_configurations.each do |config|
-      # FIX: Updated Swift version to 5.9, which is compatible with modern Firebase SDKs and Xcode 15.
-      config.build_settings['SWIFT_VERSION'] = '5.10'
-    end
   end
 end
