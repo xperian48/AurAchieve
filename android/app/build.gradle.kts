@@ -20,19 +20,10 @@ android {
         jvmToolchain(11)
     }
 
-    sourceSets {
-        // FIX: Corrected the syntax for configuring the 'main' source set.
-        getByName("main") {
-            java.srcDirs(
-                // Include the generated Flutter files.
-                "$flutterRoot/packages/flutter_tools/templates/app/android/app/src/main/java"
-            )
-        }
-    }
-
     defaultConfig {
         applicationId = "com.nicesapien.auraascend"
-        minSdk = 23
+        // FIX: Changed to a correct assignment.
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
