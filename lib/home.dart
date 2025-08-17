@@ -9,7 +9,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
@@ -117,7 +116,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _initializePageData() async {
     await _initApp();
     if (mounted) {
-      _initPushNotifications();
+      //    _initPushNotifications();
     }
   }
 
@@ -758,7 +757,7 @@ class _HomePageState extends State<HomePage> {
     return auraDatesForView;
   }
 
-  void _initPushNotifications() async {
+  /*  void _initPushNotifications() async {
     await FirebaseMessaging.instance.requestPermission(
       alert: true,
       announcement: false,
@@ -824,7 +823,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-
+*/
   void _updateTimetableSetupState(bool isComplete) {
     if (mounted) {
       setState(() {

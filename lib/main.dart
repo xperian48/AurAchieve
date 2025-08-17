@@ -5,7 +5,6 @@ import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter/services.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -35,7 +34,7 @@ void main() async {
 
   await _initializeTimezone();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  //  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   Client client = Client();
   client
