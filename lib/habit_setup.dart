@@ -468,7 +468,7 @@ class _HabitSetupState extends State<HabitSetup> {
     ][_editingIndex!];
 
     return Padding(
-      padding: const EdgeInsets.only(top: 24.0),
+      padding: const EdgeInsets.only(top: 24.0, left: 0, right: 0),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12.0),
@@ -480,7 +480,7 @@ class _HabitSetupState extends State<HabitSetup> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: 8.0,
+                horizontal: 6.0,
                 vertical: 12.0,
               ),
               child: Text(
