@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '24'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -50,30 +50,4 @@ jobs:
   #----------------------------------------------------
   # Build iOS (Requires macOS runner)
   #----------------------------------------------------
-  build_ios:
-    name: Build Flutter (iOS)
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install dependencies and pods
-        run: |
-          flutter clean
-          flutter pub get
-          cd ios
-          pod install --repo-update
-
-      - name: Build unsigned IPA
-        run: flutter build ipa --no-codesign
-
-      - name: Upload Unsigned iOS IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-ios-ipa
-          path: build/ios/ipa/*.ipa
+ 
