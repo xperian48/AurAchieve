@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../api_service.dart';
+import 'package:auraascend/screens/reminder_setup_screen.dart';
 
 class HabitSetup extends StatefulWidget {
   final String userName;
-  const HabitSetup({super.key, required this.userName});
+  final ApiService apiService;
+  const HabitSetup({
+    super.key,
+    required this.userName,
+    required this.apiService,
+  });
 
   @override
   State<HabitSetup> createState() => _HabitSetupState();
@@ -57,6 +64,28 @@ class _HabitSetupState extends State<HabitSetup> {
 
   final bool _suggestionsExpanded = true;
   bool _introForward = true;
+  final bool _submitting = false;
+
+  bool get _isComplete {
+    return List.generate(3, (i) => i).every(
+      (i) => _values[i].trim().isNotEmpty && _values[i] != _placeholders[i],
+    );
+  }
+
+  void _continueToReminders() {
+    if (!_isComplete) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReminderSetupScreen(
+          apiService: widget.apiService,
+          habitName: _values[0].trim(),
+          habitCue: _values[1].trim(),
+          habitGoal: _values[2].trim(),
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -451,6 +480,22 @@ class _HabitSetupState extends State<HabitSetup> {
                       ),
                     ),
                   ),
+                  if (_isComplete)
+                    SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _isComplete
+                                ? _continueToReminders
+                                : null,
+                            child: const Text('Continue'),
+                          ),
+                        ),
+                      ),
+                    ),
                   _buildEditInput(),
                 ],
               ),

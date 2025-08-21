@@ -847,7 +847,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final List<Widget> widgetOptions = <Widget>[
       _buildDashboardView(),
-      HabitsPage(),
+      HabitsPage(apiService: _apiService),
       SocialMediaBlockerScreen(
         apiService: _apiService,
         onChallengeCompleted: _fetchDataFromServer,

@@ -13,6 +13,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_24
         targetCompatibility = JavaVersion.VERSION_24
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlin {
@@ -20,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.nicesapien.auraascend"
+        applicationId = "com.nicesapien.aura"
         // FIX: Changed to a correct assignment.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion

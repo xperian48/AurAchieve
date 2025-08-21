@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl =
-      'https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net';
+      'https://ubiquitous-waddle-557rj9965pwh7q7g-3000.app.github.dev';
   final Account account;
   final _storage = const FlutterSecureStorage();
 
@@ -352,5 +352,87 @@ class ApiService {
     if (response.statusCode != 204) {
       throw Exception('Failed to delete study plan: ${response.body}');
     }
+  }
+
+  Future<Map<String, dynamic>> createHabit({
+    required String habitName,
+    required String habitGoal,
+    required String habitLocation,
+  }) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/habit'),
+      headers: headers,
+      body: jsonEncode({
+        'habitName': habitName,
+        'habitGoal': habitGoal,
+        'habitLocation': habitLocation,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to add habit: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getHabits() async {
+    final headers = await _getHeaders();
+    final res = await http.get(Uri.parse('$_baseUrl/api/habit'), headers: headers);
+    if (res.statusCode != 200) {
+      throw Exception('Failed to load habits: ${res.body}');
+    }
+    final data = jsonDecode(res.body);
+    if (data is List) return data;
+    if (data is Map) {
+      if (data['habits'] is List) return List.from(data['habits']);
+      if (data['documents'] is List) return List.from(data['documents']);
+      if (data['items'] is List) return List.from(data['items']);
+      if (data['data'] is List) return List.from(data['data']);
+      return [];
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> incrementHabitCompletedTimes(String habitId) async {
+    final headers = await _getHeaders();
+    final response = await http.put(
+      Uri.parse('$_baseUrl/api/habit'),
+      headers: headers,
+      body: jsonEncode({
+        'habitId': habitId,
+        'incrementCompletedTimes': 1,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to update habit: ${response.body}');
+    }
+  }
+
+  Future<void> saveHabitReminderLocal(String habitId, List<String> reminders) async {
+    final existing = await _storage.read(key: 'habit_reminders');
+    Map<String, dynamic> map = {};
+    if (existing != null && existing.isNotEmpty) {
+      try {
+        map = jsonDecode(existing);
+      } catch (_) {
+        map = {};
+      }
+    }
+    map[habitId] = reminders;
+    await _storage.write(key: 'habit_reminders', value: jsonEncode(map));
+  }
+
+  Future<List<String>?> getHabitReminderLocal(String habitId) async {
+    final existing = await _storage.read(key: 'habit_reminders');
+    if (existing == null) return null;
+    try {
+      final map = jsonDecode(existing);
+      final v = map[habitId];
+      if (v is List) return List<String>.from(v.map((e) => e.toString()));
+    } catch (_) {}
+    return null;
   }
 }
