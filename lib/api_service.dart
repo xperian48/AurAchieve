@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl =
-      'https://ubiquitous-waddle-557rj9965pwh7q7g-3000.app.github.dev';
+      'https://auraascend-fgf4aqf5gubgacb3.centralindia-01.azurewebsites.net';
   final Account account;
   final _storage = const FlutterSecureStorage();
 
@@ -378,7 +378,10 @@ class ApiService {
 
   Future<List<dynamic>> getHabits() async {
     final headers = await _getHeaders();
-    final res = await http.get(Uri.parse('$_baseUrl/api/habit'), headers: headers);
+    final res = await http.get(
+      Uri.parse('$_baseUrl/api/habit'),
+      headers: headers,
+    );
     if (res.statusCode != 200) {
       throw Exception('Failed to load habits: ${res.body}');
     }
@@ -394,15 +397,14 @@ class ApiService {
     return [];
   }
 
-  Future<Map<String, dynamic>> incrementHabitCompletedTimes(String habitId) async {
+  Future<Map<String, dynamic>> incrementHabitCompletedTimes(
+    String habitId,
+  ) async {
     final headers = await _getHeaders();
     final response = await http.put(
       Uri.parse('$_baseUrl/api/habit'),
       headers: headers,
-      body: jsonEncode({
-        'habitId': habitId,
-        'incrementCompletedTimes': 1,
-      }),
+      body: jsonEncode({'habitId': habitId, 'incrementCompletedTimes': 1}),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -411,7 +413,10 @@ class ApiService {
     }
   }
 
-  Future<void> saveHabitReminderLocal(String habitId, List<String> reminders) async {
+  Future<void> saveHabitReminderLocal(
+    String habitId,
+    List<String> reminders,
+  ) async {
     final existing = await _storage.read(key: 'habit_reminders');
     Map<String, dynamic> map = {};
     if (existing != null && existing.isNotEmpty) {

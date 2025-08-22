@@ -5,6 +5,31 @@ import 'package:intl/intl.dart';
 import 'widgets/dynamic_color_svg.dart';
 import 'api_service.dart';
 
+const List<IconData> kSubjectIcons = [
+  Icons.subject,
+  Icons.calculate,
+  Icons.science_outlined,
+  Icons.biotech_outlined,
+  Icons.rocket_launch_outlined,
+  Icons.history_edu_outlined,
+  Icons.public_outlined,
+  Icons.translate_outlined,
+  Icons.computer_outlined,
+  Icons.code,
+  Icons.palette_outlined,
+  Icons.music_note_outlined,
+  Icons.sports_soccer_outlined,
+  Icons.fitness_center,
+  Icons.account_balance_outlined,
+  Icons.book_outlined,
+  Icons.edit_outlined,
+  Icons.architecture_outlined,
+];
+
+final Map<int, IconData> kSubjectIconMap = {
+  for (final icon in kSubjectIcons) icon.codePoint: icon,
+};
+
 class Subject {
   String name;
   IconData icon;
@@ -21,13 +46,12 @@ class Subject {
   };
 
   factory Subject.fromJson(Map<String, dynamic> json) {
+    final codePoint = json['icon_code_point'] as int?;
+
+    final icon = kSubjectIconMap[codePoint] ?? Icons.subject;
     return Subject(
       name: json['name'],
-      icon: IconData(
-        json['icon_code_point'],
-        fontFamily: json['icon_font_family'],
-        fontPackage: json['icon_font_package'],
-      ),
+      icon: icon,
       color: Color(json['color_value'] ?? Colors.blue.value),
     );
   }
@@ -80,24 +104,6 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
     Colors.cyan[200]!,
   ];
 
-  static const Map<String, IconData> _subjectIconMapping = {
-    'math': Icons.calculate,
-    'physic': Icons.rocket_launch_outlined,
-    'chem': Icons.science_outlined,
-    'bio': Icons.biotech_outlined,
-    'hist': Icons.history_edu_outlined,
-    'geo': Icons.public_outlined,
-    'eng': Icons.translate_outlined,
-    'lang': Icons.translate_outlined,
-    'comp': Icons.computer_outlined,
-    'code': Icons.code,
-    'art': Icons.palette_outlined,
-    'music': Icons.music_note_outlined,
-    'sport': Icons.sports_soccer_outlined,
-    'pe': Icons.fitness_center,
-    'eco': Icons.account_balance_outlined,
-  };
-
   @override
   void initState() {
     super.initState();
@@ -113,9 +119,9 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
   IconData _getIconForSubject(String subjectName) {
     final lowerCaseName = subjectName.toLowerCase();
-    for (var key in _subjectIconMapping.keys) {
-      if (lowerCaseName.contains(key)) {
-        return _subjectIconMapping[key]!;
+    for (var key in kSubjectIconMap.keys) {
+      if (lowerCaseName.contains(key.toString())) {
+        return kSubjectIconMap[key]!;
       }
     }
     return Icons.subject;
@@ -1235,27 +1241,6 @@ class SubjectIconPickerDialog extends StatelessWidget {
   final IconData initialIcon;
   const SubjectIconPickerDialog({super.key, required this.initialIcon});
 
-  static const List<IconData> _icons = [
-    Icons.subject,
-    Icons.calculate,
-    Icons.science_outlined,
-    Icons.biotech_outlined,
-    Icons.rocket_launch_outlined,
-    Icons.history_edu_outlined,
-    Icons.public_outlined,
-    Icons.translate_outlined,
-    Icons.computer_outlined,
-    Icons.code,
-    Icons.palette_outlined,
-    Icons.music_note_outlined,
-    Icons.sports_soccer_outlined,
-    Icons.fitness_center,
-    Icons.account_balance_outlined,
-    Icons.book_outlined,
-    Icons.edit_outlined,
-    Icons.architecture_outlined,
-  ];
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -1269,9 +1254,9 @@ class SubjectIconPickerDialog extends StatelessWidget {
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
-          itemCount: _icons.length,
+          itemCount: kSubjectIcons.length,
           itemBuilder: (context, index) {
-            final icon = _icons[index];
+            final icon = kSubjectIcons[index];
             return InkWell(
               onTap: () => Navigator.pop(context, icon),
               child: Container(
