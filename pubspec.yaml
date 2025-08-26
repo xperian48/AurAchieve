@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   appwrite: ^17.0.0
-  flutter_svg: ^2.0.10
+  flutter_svg: ^2.2.0
   google_fonts: ^6.2.1
   image_picker: ^1.1.2
   shared_preferences: ^2.2.2

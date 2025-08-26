@@ -142,7 +142,7 @@ class _HabitsPageState extends State<HabitsPage>
       case 2:
         return (bg: s.tertiaryContainer, fg: s.onTertiaryContainer);
       case 3:
-        return (bg: s.surfaceVariant, fg: s.onSurfaceVariant);
+        return (bg: s.surfaceContainerHighest, fg: s.onSurfaceVariant);
       default:
         return (bg: s.surfaceContainerHigh, fg: s.onSurface);
     }
