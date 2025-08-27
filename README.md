@@ -6,6 +6,10 @@ AurAchieve is the only self-improvement app you'll ever need. Earn Aura for ever
 
 Get it now through [GitHub actions](https://github.com/NiceSapien/AurAchieve/actions).
 
+Get into the community for insider news and updates!: [Discord](https://discord.gg/XQ5U7p7bdz)
+
+Pre-register for release: [Google forms](https://docs.google.com/forms/d/e/1FAIpQLSdA6v4FyNCA9lzf_E-mPBP-PtF9ioedzijNrLCMPM9F_WuFgA/viewform?usp=header)
+
 ## Self-hosting
 
 If you wish to self-host AurAchieve for some reason, you'll have to clone the [backend](https://github.com/NiceSapien/AurAchieve-backend) repository aswell, written in ExpressJS. The instructions to setup the backend are present in the repository readme.
