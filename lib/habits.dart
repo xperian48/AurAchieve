@@ -5,6 +5,7 @@ import 'api_service.dart';
 import 'screens/habit_setup.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
+import 'package:auraascend/widgets/dynamic_color_svg.dart' as dynamic_color_svg;
 
 class HabitsPage extends StatefulWidget {
   final ApiService apiService;
@@ -396,13 +397,11 @@ class _HabitsPageState extends State<HabitsPage>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SvgPicture.asset(
-                    'assets/img/habit.svg',
-                    height: 150,
-                    colorFilter: ColorFilter.mode(
-                      scheme.primary,
-                      BlendMode.srcIn,
-                    ),
+                  DynamicColorSvg(
+                    assetName: 'assets/img/habit.svg',
+                    color: scheme.primary,
+                    width: 240,
+                    height: 240,
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -415,7 +414,7 @@ class _HabitsPageState extends State<HabitsPage>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tap Add Habit to begin',
+                    'Add a habit from the button below.',
                     style: GoogleFonts.gabarito(
                       fontSize: 14,
                       color: scheme.outline.withOpacity(0.7),
