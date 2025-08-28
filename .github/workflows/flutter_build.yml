@@ -55,15 +55,20 @@ jobs:
         run: flutter pub upgrade # Changed from 'flutter pub get'
 
       # NOTE: Analyze and test steps removed.
-
-      - name: Build Flutter APK (Release with testkey)
+      - name: Build Flutter APK (Debug)
         run: flutter build apk --debug
 
-      - name: Upload Android APK Artifact
+      - name: Zip Debug APK
+        run: |
+          cd build/app/outputs/flutter-apk
+          zip -j app-debug.zip app-debug.apk
+
+      - name: Upload Debug APK Zip Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: debug-apk-zip
+          path: build/app/outputs/flutter-apk/app-debug.zip
+
   
   #----------------------------------------------------
   # Build iOS (Requires macOS runner)
